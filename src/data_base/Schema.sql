@@ -10,3 +10,11 @@ CREATE TABLE Sessions (
     session_id VARCHAR(255) Primary Key
 );
 
+CREATE TABLE Games (
+    game_owner VARCHAR(255) Primary Key,
+    game_score INT NOT NULL DEFAULT 0,
+    game_level INT NOT NULL DEFAULT 0,
+    game_lines INT NOT NULL DEFAULT 0,
+    game_actions JSONB NOT NULL
+);
+
