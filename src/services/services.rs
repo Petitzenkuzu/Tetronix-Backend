@@ -3,6 +3,7 @@ use crate::AppState;
 use sqlx;
 use crate::models::Session;
 use crate::models::User;
+use crate::models::Game;
 use actix_web::cookie::{Cookie, SameSite};
 
 #[get("/user")]
@@ -88,6 +89,45 @@ pub async fn logout(session : Option<Session>, state: Data<AppState>, _req: Http
         }
         Err(_e) => {
             return HttpResponse::InternalServerError().body("Internal server error");
+        }
+    }
+}
+
+#[get("/game")]
+pub async fn get_game(session : Option<Session>, state: Data<AppState>, _req: HttpRequest) -> impl Responder {
+    if let None = session {
+        return HttpResponse::Unauthorized().body("Invalid session");
+    }
+    else{
+        let game = crate::data_base::get_game_from_owner(&state.db, &session.unwrap().name).await;
+        match game {
+            Ok(game) => {
+                return HttpResponse::Ok().json(game);
+            }
+            Err(e) => {
+                if let sqlx::Error::RowNotFound = e {
+                    return HttpResponse::NotFound().body("No game found");
+                }
+                return HttpResponse::InternalServerError().body("Internal server error");
+            }
+        }
+    }
+}
+
+#[post("/game")]
+pub async fn upsert_game(session : Option<Session>, game : Json<Game>, state: Data<AppState>, _req: HttpRequest) -> impl Responder {
+    if let None = session {
+        return HttpResponse::Unauthorized().body("Invalid session");
+    }
+    else{
+        let result = crate::data_base::upsert_game(&state.db, &game).await;
+        match result {
+            Ok(_) => {
+                return HttpResponse::Ok().body("Game upserted");
+            }
+            Err(_e) => {
+                return HttpResponse::InternalServerError().body("Internal server error");
+            }
         }
     }
 }
