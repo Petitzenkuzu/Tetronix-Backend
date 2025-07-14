@@ -1,4 +1,4 @@
-use actix_web::{get, web::Data, HttpResponse, Responder, HttpRequest, post, web::Json};
+use actix_web::{get, web::Data, HttpResponse, Responder, HttpRequest, post, web::Json, web::Path};
 use crate::AppState;
 use sqlx;
 use crate::models::Session;
@@ -93,13 +93,34 @@ pub async fn logout(session : Option<Session>, state: Data<AppState>, _req: Http
     }
 }
 
-#[get("/game")]
-pub async fn get_game(session : Option<Session>, state: Data<AppState>, _req: HttpRequest) -> impl Responder {
+#[get("/game/{gameOwner}")]
+pub async fn get_game(session : Option<Session>, game_owner : Path<String>, state: Data<AppState>, _req: HttpRequest) -> impl Responder {
     if let None = session {
         return HttpResponse::Unauthorized().body("Invalid session");
     }
     else{
-        let game = crate::data_base::get_game_from_owner(&state.db, &session.unwrap().name).await;
+        let game = crate::data_base::get_game_from_owner(&state.db, &game_owner).await;
+        match game {
+            Ok(game) => {
+                return HttpResponse::Ok().json(game);
+            }
+            Err(e) => {
+                if let sqlx::Error::RowNotFound = e {
+                    return HttpResponse::NotFound().body("No game found");
+                }
+                return HttpResponse::InternalServerError().body("Internal server error");
+            }
+        }
+    }
+}
+
+#[get("/game_stats")]
+pub async fn get_game_stats(session : Option<Session>, state: Data<AppState>, _req: HttpRequest) -> impl Responder {
+    if let None = session {
+        return HttpResponse::Unauthorized().body("Invalid session");
+    }
+    else{
+        let game = crate::data_base::get_game_stats_from_owner(&state.db, &session.unwrap().name).await;
         match game {
             Ok(game) => {
                 return HttpResponse::Ok().json(game);

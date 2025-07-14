@@ -6,7 +6,7 @@ mod models;
 mod data_base;
 mod extractors;
 use auth::{github_auth, github_auth_mobile};
-use services::{get_user, get_leaderboard, post_user, logout};
+use services::{get_user, get_leaderboard, post_user, logout, upsert_game, get_game, get_game_stats};
 use dotenv::dotenv;
 use std::env;
 use sqlx::{Pool, postgres::PgPoolOptions,Postgres} ;
@@ -56,6 +56,9 @@ async fn main() -> std::io::Result<()> {
                 .service(get_leaderboard)
                 .service(post_user)
                 .service(logout)
+                .service(upsert_game)
+                .service(get_game)
+                .service(get_game_stats)
             )
         )
     }).workers(4)

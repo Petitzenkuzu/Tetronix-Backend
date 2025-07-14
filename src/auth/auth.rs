@@ -204,9 +204,15 @@ async fn get_access_token_mobile(code: &str, redirect_uri: &str) -> Result<Strin
         .header("Accept", "application/json")
         .send()
         .await?;
-
-    let token_data = response.json::<GithubTokenResponse>().await.unwrap();
-    Ok(token_data.access_token)
+    match  response.json::<GithubTokenResponse>().await {
+        Ok(token_data) => {
+            Ok(token_data.access_token)
+        }
+        Err(e) => {
+            println!("Error: {}", e);
+            Err(e)
+        }
+    }
 }
 
 /*
@@ -221,8 +227,16 @@ async fn get_user_info_mobile(token: &str) -> Result<GithubUser, reqwest::Error>
         .send()
         .await.expect("Failed to send request");
 
-    let user = response.json::<GithubUser>().await.expect("Failed to parse response");
-    Ok(user)
+    let user = response.json::<GithubUser>().await;
+    match user {
+        Ok(user) => {
+            Ok(user)
+        }
+        Err(e) => {
+            println!("Error: {}", e);
+            Err(e)
+        }
+    }
 }
 
 
@@ -231,8 +245,16 @@ pub async fn github_auth_mobile(state: Data<AppState>, query: web::Query<GithubA
     dotenv().ok();
     
     let code = &query.code;
-    let access_token = get_access_token_mobile(code, &query.redirect_uri).await.unwrap();
-    let github_user = get_user_info_mobile(&access_token).await.unwrap();
+    let access_token = get_access_token_mobile(code, &query.redirect_uri).await;
+    if let Err(e) = access_token {
+        return HttpResponse::InternalServerError().body(format!("Internal server error : {}", e));
+    }
+    let access_token = access_token.unwrap();
+    let github_user = get_user_info_mobile(&access_token).await;
+    if let Err(e) = github_user {
+        return HttpResponse::InternalServerError().body(format!("Internal server error : {}", e));
+    }
+    let github_user = github_user.unwrap();
     // Récupération du nom d'utilisateur GitHub
     let username = github_user.login;
     

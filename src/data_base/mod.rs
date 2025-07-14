@@ -14,3 +14,4 @@ pub use data_base::update_user;
 pub use data_base::upsert_game;
 pub use data_base::get_game_from_owner;
 pub use data_base::delete_game;
+pub use data_base::get_game_stats_from_owner;

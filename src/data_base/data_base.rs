@@ -1,6 +1,6 @@
 use sqlx::{Pool,Postgres} ;
 
-use crate::models::{User,Session, Game, GameJson, Action};
+use crate::models::{User,Session, Game, GameJson, GameStats};
 /*
     Return () si le user a été créé
     Return sqlx::Error::RowNotFound si le user n'a pas été créé
@@ -171,9 +171,7 @@ pub async fn update_user(pool: &Pool<Postgres>, user: &User) -> Result<(), sqlx:
  *  Return () si le game a été créé ou mis à jour
  */
 pub async fn upsert_game(pool: &Pool<Postgres>, game: &Game) -> Result<(), sqlx::Error> {
-    let actions = serde_json::to_string(&game.game_actions)
-        .map_err(|_| sqlx::Error::WorkerCrashed)?;
-
+    let actions = serde_json::to_value(&game.game_actions).map_err(|_| sqlx::Error::WorkerCrashed)?;
     let result = sqlx::query("INSERT INTO games (game_owner, game_score, game_level, game_lines, game_actions) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (game_owner) DO UPDATE SET game_score = EXCLUDED.game_score, game_level = EXCLUDED.game_level, game_lines = EXCLUDED.game_lines, game_actions = EXCLUDED.game_actions")
         .bind(&game.game_owner)
         .bind(game.game_score)
@@ -198,18 +196,37 @@ pub async fn upsert_game(pool: &Pool<Postgres>, game: &Game) -> Result<(), sqlx:
  */
 pub async fn get_game_from_owner(pool: &Pool<Postgres>, owner: &str) -> Result<Game, sqlx::Error> {
 
-    let game_json = sqlx::query_as::<_, GameJson>("SELECT * FROM games WHERE game_owner = $1 ;")
+    let game = sqlx::query_as::<_, GameJson>("SELECT * FROM games WHERE game_owner = $1 LIMIT 1 ;")
         .bind(owner)
         .fetch_one(pool)
         .await?;
-    let game_actions : Vec<Action> = serde_json::from_str(&game_json.game_actions).map_err(|_| sqlx::Error::WorkerCrashed)?;
+
+    let game_actions: Vec<crate::models::Action> = serde_json::from_value(game.game_actions)
+        .map_err(|_| sqlx::Error::WorkerCrashed)?;
+
     let game = Game {
-        game_owner: game_json.game_owner,
-        game_score: game_json.game_score,
-        game_level: game_json.game_level,
-        game_lines: game_json.game_lines,
-        game_actions: game_actions,
+        game_owner: game.game_owner,
+        game_score: game.game_score,
+        game_level: game.game_level,
+        game_lines: game.game_lines,
+        game_actions,
     };
+
+    Ok(game)
+}
+
+/**
+ *  Return un GameStats
+ *  Return sqlx::Error::RowNotFound si la game n'existe pas
+ *  Return sqlx::Error si c'est une erreur de base de données
+ */
+pub async fn get_game_stats_from_owner(pool: &Pool<Postgres>, owner: &str) -> Result<GameStats, sqlx::Error> {
+
+    let game = sqlx::query_as::<_, GameStats>("SELECT game_score, game_level, game_lines FROM games WHERE game_owner = $1 LIMIT 1 ;")
+        .bind(owner)
+        .fetch_one(pool)
+        .await?;
+
     Ok(game)
 }
 
