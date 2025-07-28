@@ -2791,7 +2791,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tetris_back"
+name = "tetronix_backend"
 version = "0.1.0"
 dependencies = [
  "actix-cors",

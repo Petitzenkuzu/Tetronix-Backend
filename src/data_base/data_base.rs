@@ -99,7 +99,6 @@ pub async fn create_session(pool: &Pool<Postgres>, name: &str , session_id: &str
         .bind(session_id)
         .execute(pool)
         .await?;
-
     if result.rows_affected() == 0 {
         return Err(sqlx::Error::RowNotFound);
     }
@@ -289,7 +288,9 @@ mod tests {
         //Test de la création, de la récupération et de la suppression d'un user
         let pool = get_pool().await;
         let name = get_random_string();
-        create_user(pool, &name).await.unwrap();
+        
+        // test d'un user valide
+        assert!(create_user(pool, &name).await.is_ok());
         let user = get_user_from_name(pool, &name).await.unwrap();
         assert_eq!(user.name, name);
         assert_eq!(user.best_score, 0);
@@ -297,6 +298,12 @@ mod tests {
         assert_eq!(user.number_of_games, 0);
         assert!(delete_user(pool, &name).await.is_ok());
         assert!(delete_user(pool, &name).await.is_err());
+
+        // test d'un user invalide
+        let un_authorized_name = "a";
+        assert!(create_user(pool, un_authorized_name).await.is_err());
+        assert!(get_user_from_name(pool, un_authorized_name).await.is_err());
+        assert!(delete_user(pool, un_authorized_name).await.is_err());
     }
 
     #[tokio::test]
@@ -307,7 +314,13 @@ mod tests {
         let name = get_random_string();
         let session_id = get_random_string();
 
-        create_session(pool, &name, &session_id).await.unwrap();
+        // test d'une session valide
+        assert!(create_user(pool, &name).await.is_ok());
+        assert!(create_session(pool, &name, &session_id).await.is_ok());
+
+        // test insertion d'un session_id déjà existant
+        assert!(create_session(pool, &name, &session_id).await.is_err());
+
         let session = get_session_from_name(pool, &name).await.unwrap();
 
         assert_eq!(session.name, name);
@@ -320,6 +333,12 @@ mod tests {
 
         assert!(delete_session(pool, &session_id).await.is_ok());
         assert!(delete_session(pool, &session_id).await.is_err());
+        assert!(delete_user(pool, &name).await.is_ok());
+        assert!(delete_user(pool, &name).await.is_err());
+
+        // test des get des sessions avec un nom et un invalide
+        assert!(get_session_from_name(pool, &name).await.is_err());
+        assert!(get_session_from_id(pool, &session_id).await.is_err());
     }
 
     #[tokio::test]
@@ -339,11 +358,15 @@ mod tests {
         assert_eq!(user.highest_level, 0);
         assert_eq!(user.number_of_games, 0);
 
+        // delete cascade alors session supprimée en même temps que le user
         assert!(delete_user(pool, &name).await.is_ok());
-        assert!(delete_session(pool, &session_id).await.is_ok());
         assert!(delete_user(pool, &name).await.is_err());
         assert!(delete_session(pool, &session_id).await.is_err());
+
+        // test d'une session invalide
+        assert!(get_user_from_session(pool, &session_id).await.is_err());
     }
+
     #[tokio::test]
     async fn test_get_session_from_name() {
         //Test de la récupération d'une session à partir d'un nom
@@ -351,6 +374,7 @@ mod tests {
         let name = get_random_string();
         let session_id = get_random_string();
 
+        create_user(pool, &name).await.unwrap();
         create_session(pool, &name, &session_id).await.unwrap();
 
         let session = get_session_from_name(pool, &name).await.unwrap();
@@ -358,7 +382,8 @@ mod tests {
         assert_eq!(session.name, name);
         assert_eq!(session.session_id, session_id);
 
-        assert!(delete_session(pool, &session_id).await.is_ok());
+        // delete cascade alors session supprimée en même temps que le user
+        assert!(delete_user(pool, &name).await.is_ok());
         assert!(delete_session(pool, &session_id).await.is_err());
     }
     #[tokio::test]
@@ -379,9 +404,12 @@ mod tests {
         let name = get_random_string();
         let session_id = get_random_string();
 
+        create_user(pool, &name).await.unwrap();
         create_session(pool, &name, &session_id).await.unwrap();
 
-        assert!(delete_session(pool, &session_id).await.is_ok());
+        // delete cascade alors user supprimé en même temps que la session
+        assert!(delete_user(pool, &name).await.is_ok());
+        assert!(delete_user(pool, &name).await.is_err());
         assert!(delete_session(pool, &session_id).await.is_err());
     }
 
