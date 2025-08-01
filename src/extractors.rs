@@ -1,4 +1,4 @@
-use crate::models::Session;
+/*use crate::models::Session;
 use crate::data_base::get_session_from_id;
 use actix_web::{FromRequest, HttpRequest, Error, dev::Payload, web::Data};
 use crate::AppState;
@@ -32,4 +32,4 @@ impl FromRequest for Session {
         }
     }
 
-}
+}*/
