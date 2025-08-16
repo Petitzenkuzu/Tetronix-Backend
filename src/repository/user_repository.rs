@@ -1,7 +1,7 @@
 use sqlx::{Pool, Postgres};
 use crate::models::User;
 use crate::errors::RepositoryError;
-
+#[derive(Clone)]
 pub struct UserRepository {
     pub db: Pool<Postgres>,
 }
@@ -46,8 +46,12 @@ impl UserRepository {
                 match e {
                     sqlx::Error::Database(e) => {
                         if e.is_unique_violation() {
-                            Err(RepositoryError::AlreadyExists{what: "User".into(), identifier: name.into()})
-                        } else {
+                            Err(RepositoryError::AlreadyExists{what: "User".into()})
+                        } 
+                        else if e.is_check_violation() {
+                            Err(RepositoryError::InvalidInput{what: "User name".into()})
+                        }
+                        else {
                             Err(RepositoryError::InternalServerError(e.to_string()))
                         }
                     }
@@ -90,7 +94,7 @@ impl UserRepository {
         match result {
             Ok(result) => {
                 if result.rows_affected() == 0 {
-                    Err(RepositoryError::NotFound{what: "User".into(), identifier: user.name.clone()})
+                    Err(RepositoryError::NotFound{what: "User".into()})
                 } else {
                     Ok(())
                 }
@@ -129,7 +133,7 @@ impl UserRepository {
         .await;
         match user {
             Ok(Some(user)) => Ok(user),
-            Ok(None) => Err(RepositoryError::NotFound{what: "User".into(), identifier: name.into()}),
+            Ok(None) => Err(RepositoryError::NotFound{what: "User".into()}),
             Err(e) => Err(RepositoryError::InternalServerError(e.to_string())),
         }
     }
@@ -199,7 +203,7 @@ impl UserRepository {
         match result {
             Ok(result) => {
                 if result.rows_affected() == 0 {
-                    Err(RepositoryError::NotFound{what: "User".into(), identifier: name.into()})
+                    Err(RepositoryError::NotFound{what: "User".into()})
                 } else {
                     Ok(())
                 }

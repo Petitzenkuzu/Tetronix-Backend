@@ -7,7 +7,7 @@ CREATE TABLE Users (
 
 CREATE TABLE Sessions (
     name VARCHAR(255) NOT NULL,
-    session_id VARCHAR(255) Primary Key,
+    session_id VARCHAR(64) Primary Key,
     FOREIGN KEY (name) REFERENCES Users(name) ON DELETE CASCADE
 );
 

@@ -7,12 +7,12 @@ pub enum ServicesError {
     InternalServerError(String),
     #[error("Invalid Input on field : {field} , {message}")]
     InvalidInput{field: String, message: String},
-    #[error("{what} {identifier} not found")]
-    NotFound{what: String, identifier: String},
-    #[error("{what} {identifier} already exists")]
-    AlreadyExists{what: String, identifier: String},
-    #[error("unable to delete {what} {identifier}")]
-    UnableToDelete{what: String, identifier: String},
+    #[error("{what} not found")]
+    NotFound{what: String},
+    #[error("{what} already exists")]
+    AlreadyExists{what: String},
+    #[error("unable to delete {what}")]
+    UnableToDelete{what: String},
     #[error("unable to serialize {what}")]
     UnableToSerialize{what: String},
     #[error("unable to deserialize {what}")]
@@ -24,14 +24,17 @@ pub enum ServicesError {
 impl From<RepositoryError> for ServicesError {
     fn from(err: RepositoryError) -> Self {
         match err {
-            RepositoryError::NotFound { what, identifier } => {
-                ServicesError::NotFound { what, identifier }
+            RepositoryError::NotFound { what } => {
+                ServicesError::NotFound { what }
             }
-            RepositoryError::AlreadyExists { what, identifier } => {
-                ServicesError::AlreadyExists { what, identifier }
+            RepositoryError::AlreadyExists { what } => {
+                ServicesError::AlreadyExists { what }
             }
             RepositoryError::InternalServerError(msg) => {
                 ServicesError::InternalServerError(msg)
+            }
+            RepositoryError::InvalidInput { what } => {
+                ServicesError::InvalidInput { field: what, message: "is invalid".to_string() }
             }
             RepositoryError::InvalidLimit { low, high } => {
                 ServicesError::InvalidInput { field: "limit".to_string(), message: format!("must be greater or equal to {} and less or equal to {}", low, high) }

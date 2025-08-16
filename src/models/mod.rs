@@ -10,7 +10,9 @@ pub use game::GameJson;
 pub use game::GameStats;
 pub use game::Piece;
 pub use game::Action;
-
+pub use game::ActionType;
+pub use game::PieceType;
+pub use game::Grid;
 
 mod auth;
 
@@ -18,9 +20,9 @@ pub use auth::GithubCredentials;
 pub use auth::GithubTokenResponse;
 pub use auth::GithubUser;
 
-mod config;
+mod state;
 
-pub use config::AppState;
+pub use state::AppState;
 
 
 

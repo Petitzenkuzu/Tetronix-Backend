@@ -3,7 +3,9 @@ use crate::errors::RepositoryError;
 use crate::models::Game;
 use crate::models::GameStats;
 use crate::models::GameJson;
+use crate::models::Action;
 
+#[derive(Clone)]
 pub struct GameRepository {
     pub db: Pool<Postgres>,
 }
@@ -66,6 +68,7 @@ impl GameRepository {
     /// 
     /// * `Ok(game)` - If the game has been found
     /// * `Err(RepositoryError::NotFound)` - If the game does not exist
+    /// * `Err(RepositoryError::DeserializationError)` - If the game actions cannot be deserialized
     /// * `Err(RepositoryError::InternalServerError)` - If there is a database error
     /// 
     /// # Examples
@@ -86,7 +89,7 @@ impl GameRepository {
 
         match game {
             Ok(Some(game)) => {
-                let game_actions: Vec<crate::models::Action> = serde_json::from_value(game.game_actions)
+                let game_actions: Vec<Action> = serde_json::from_value(game.game_actions)
                     .map_err(|_| RepositoryError::DeserializationError("Failed to deserialize game actions".into()))?;
 
                 let game = Game {
@@ -99,7 +102,7 @@ impl GameRepository {
 
                 Ok(game)
             }
-            Ok(None) => Err(RepositoryError::NotFound{what: "Game".into(), identifier: owner.into()}),
+            Ok(None) => Err(RepositoryError::NotFound{what: "Game".into()}),
             Err(e) => Err(RepositoryError::InternalServerError(e.to_string())),
         }
     }
@@ -134,46 +137,7 @@ impl GameRepository {
     
         match game {
             Ok(Some(game)) => Ok(game),
-            Ok(None) => Err(RepositoryError::NotFound{what: "Game".into(), identifier: owner.into()}),
-            Err(e) => Err(RepositoryError::InternalServerError(e.to_string())),
-        }
-    }
-
-    /// Delete a game
-    /// 
-    /// # Arguments
-    /// 
-    /// * `owner` - The name of the user to delete the game for
-    /// 
-    /// # Returns
-    /// 
-    /// * `Ok(())` - If the game has been deleted successfully
-    /// * `Err(RepositoryError::NotFound)` - If the game does not exist
-    /// * `Err(RepositoryError::InternalServerError)` - If there is a database error
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// let repo = GameRepository::new(db_pool);
-    /// match repo.delete_game("john_doe").await {
-    ///     Ok(()) => println!("Game deleted successfully"),
-    ///     Err(e) => eprintln!("Error deleting game: {}", e),
-    /// }
-    /// ```
-    pub async fn delete_game(&self, owner: &str) -> Result<(), RepositoryError> {
-        let result = sqlx::query("DELETE FROM games WHERE game_owner = $1")
-            .bind(owner)
-            .execute(&self.db)
-            .await;
-    
-        match result {
-            Ok(result) => {
-                if result.rows_affected() == 0 {
-                    Err(RepositoryError::NotFound{what: "Game".into(), identifier: owner.into()})
-                } else {
-                    Ok(())
-                }
-            },
+            Ok(None) => Err(RepositoryError::NotFound{what: "Game".into()}),
             Err(e) => Err(RepositoryError::InternalServerError(e.to_string())),
         }
     }

@@ -1,8 +1,4 @@
-use actix_web::{
-    error, get,
-    http::{header::ContentType, StatusCode},
-    App, HttpResponse,
-};
+use actix_web::{ error, http::{header::ContentType, StatusCode}, HttpResponse };
 use thiserror::Error;
 use crate::errors::ServicesError;
 
@@ -12,8 +8,8 @@ pub enum AppError {
     InternalServerError(String),
     #[error("bad request: {0}")]
     BadRequest(String),
-    #[error("unauthorized: {0}")]
-    Unauthorized(String),
+    #[error("Authentication required")]
+    Unauthorized,
     #[error("not found: {0}")]
     NotFound(String),
     #[error("conflict: {0}")]
@@ -31,23 +27,23 @@ impl From<ServicesError> for AppError {
             ServicesError::InvalidInput { field, message } => {
                 AppError::BadRequest(format!("Invalid {}: {}", field, message))
             },
-            ServicesError::NotFound { what, identifier } => {
-                AppError::NotFound(format!("{} '{}' not found", what, identifier))
+            ServicesError::NotFound { what } => {
+                AppError::NotFound(format!("{} not found", what))
             },
-            ServicesError::AlreadyExists { what, identifier } => {
-                AppError::Conflict(format!("{} '{}' already exists", what, identifier))
+            ServicesError::AlreadyExists { what } => {
+                AppError::Conflict(format!("{} already exists", what))
             },
-            ServicesError::UnableToDelete { what, identifier } => {
-                AppError::InternalServerError(format!("Failed to delete {} '{}'", what, identifier))
+            ServicesError::UnableToDelete { what: _ } => {
+                AppError::InternalServerError("Something went wrong".to_string())
             },
-            ServicesError::UnableToSerialize { what } => {
-                AppError::InternalServerError(format!("Serialization failed for {}", what))
+            ServicesError::UnableToSerialize { what: _ } => {
+                AppError::InternalServerError("Data processing error".to_string())
             },
-            ServicesError::UnableToDeserialize { what } => {
-                AppError::InternalServerError(format!("Deserialization failed for {}", what))
+            ServicesError::UnableToDeserialize { what: _ } => {
+                AppError::InternalServerError("Data processing error".to_string())
             },
-            ServicesError::InternalServerError(msg) => {
-                AppError::InternalServerError(msg)
+            ServicesError::InternalServerError(_) => {
+                AppError::InternalServerError("Something went wrong".to_string())
             },
         }
     }
@@ -56,7 +52,7 @@ impl From<ServicesError> for AppError {
 impl error::ResponseError for AppError {
     fn error_response(&self) -> HttpResponse {
         HttpResponse::build(self.status_code())
-            .insert_header(ContentType::html())
+            .insert_header(ContentType::json())
             .body(self.to_string())
     }
 
@@ -64,7 +60,7 @@ impl error::ResponseError for AppError {
         match self {
             AppError::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
-            AppError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            AppError::Unauthorized => StatusCode::UNAUTHORIZED,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Conflict(_) => StatusCode::CONFLICT,
             AppError::AuthenticationFailed(_) => StatusCode::UNAUTHORIZED,
