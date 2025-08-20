@@ -13,6 +13,8 @@ pub use game::Action;
 pub use game::ActionType;
 pub use game::PieceType;
 pub use game::Grid;
+pub use game::GameResult;
+pub use game::GameCloseReason;
 
 mod auth;
 

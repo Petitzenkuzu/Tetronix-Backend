@@ -20,5 +20,4 @@ CREATE TABLE Games (
     FOREIGN KEY (game_owner) REFERENCES Users(name) ON DELETE CASCADE
 );
 
--- Indexes pour un max de vitesse ( ça fait une sorte de table fantôme qui stock les meilleurs scores des user donc get leaderboard est plus rapide)
 CREATE INDEX idx_users_best_score ON Users(best_score DESC);

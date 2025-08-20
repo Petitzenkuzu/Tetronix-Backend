@@ -1,7 +1,7 @@
 use crate::{AppState, config::{AuthConfig, SessionConfig}, services::{AuthService, GameService, SessionService, UserService}, repository::{GameRepository, SessionRepository, UserRepository}};
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use dotenv::dotenv;
-use crate::tests::unit::helpers::common_helpers::GameBuilder;
+use crate::builder::game_builder::GameBuilder;
 use std::sync::OnceLock;
 use std::env;
 use uuid::Uuid;

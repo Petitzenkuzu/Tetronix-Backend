@@ -1,13 +1,13 @@
 use actix_web::{HttpRequest, get, HttpResponse};
 use actix_web::{rt, web};
 use crate::errors::AppError;
-use actix_ws::{AggregatedMessage, CloseCode, CloseReason};
+use actix_ws::{AggregatedMessage};
 use futures_util::StreamExt as _;
-use crate::models::{Session, User, Game};
+use crate::models::{Session, GameResult, GameCloseReason};
 use crate::models::{Action, ActionType, PieceType};
 use crate::game_logic::GameEngine;
 use crate::AppState;
-use std::time::Instant;
+use crate::builder::{game_builder::GameBuilder, user_builder::UserBuilder};
 
 #[get("/start")]
 async fn start_game(session: Session, state: web::Data<AppState>, req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, AppError> {
@@ -17,31 +17,23 @@ async fn start_game(session: Session, state: web::Data<AppState>, req: HttpReque
         .aggregate_continuations()
         .max_continuation_size(2_usize.pow(10));
 
+
     rt::spawn(async move {
         let user = state.user_service.get_by_name(&session.name).await;
         if user.is_err() {
-            let close_reason = CloseReason {
-                code: CloseCode::Policy,
-                description: Some("User not found".to_string()),
-            };
-            ws_session.close(Some(close_reason)).await.unwrap();
-            return;
+            ws_session.close(Some(GameCloseReason::NoUserFound.to_close_reason())).await.unwrap();
+             return;
         }
         let user = user.unwrap();
         let mut game_engine = GameEngine::new();
         let mut game_actions : Vec<Action> = Vec::new();
-        let mut last_ping_time = Instant::now();
-        const TIMEOUT_SECONDS: u64 = 20000;
+
         while let Some(msg) = stream.next().await {
             match msg {
                 Ok(AggregatedMessage::Binary(bin)) => {
                     if bin.len() != 10 {
                         // code 1008 pas sensé arriver car requête authentifiée
-                        let close_reason = CloseReason {
-                            code: CloseCode::Invalid,
-                            description: Some("Invalid message length".to_string()),
-                        };
-                        ws_session.close(Some(close_reason)).await.unwrap();
+                        ws_session.close(Some(GameCloseReason::InvalidMessageLength.to_close_reason())).await.unwrap();
                         return;
                     }
 
@@ -51,57 +43,47 @@ async fn start_game(session: Session, state: web::Data<AppState>, req: HttpReque
                         timestamp: i64::from_be_bytes(bin[2..bin.len()].try_into().unwrap()),
                     };
 
-                    if game_action.action_type == ActionType::Ping {
-                        last_ping_time = Instant::now();
-                        println!("Ping received");
-                        let ack_response = vec![0x00];
-                        ws_session.binary(ack_response).await.unwrap();
-                        continue;
-                    }
-
                     let result = game_engine.handle_action(&game_action);
 
                     game_actions.push(game_action);
 
-                    if let Some((score,level,lines)) = result {
+                    // cheater detected
+                    if let Some(GameResult::IllegalMove) = result {
+                        println!("Illegal move");
+                        ws_session.close(Some(GameCloseReason::IllegalMove.to_close_reason())).await.unwrap();
+                        break;
+                    }
 
-                        // code 1000 pour une fin de partie normale
-                        let mut close_reason = CloseReason {
-                            code: CloseCode::Normal,
-                            description: Some("Game ended".to_string()),
-                        };
+                    // game ended
+                    if let Some(GameResult::Score(score,level,lines)) = result {
 
-                        let updated_user = User {
-                            name: user.name.clone(),
-                            number_of_games: user.number_of_games + 1,
-                            best_score: user.best_score.max(score),
-                            highest_level: user.highest_level.max(level),
-                        };
+                        let updated_user = UserBuilder::new(&user.name)
+                            .with_games(user.number_of_games + 1)
+                            .with_score(user.best_score.max(score))
+                            .with_level(user.highest_level.max(level))
+                            .build();
 
                         let res = state.user_service.update(&updated_user).await;
-                        // code 1011 pour une erreur de mise à jour de l'utilisateur
                         if res.is_err() {
-                            close_reason.code = CloseCode::Error;
-                            close_reason.description = Some("Error updating user".to_string());
+                            ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
+                            break;
                         }
 
-                        if score > user.best_score && res.is_ok() {
-                            let game = Game {
-                                game_owner: user.name.clone(),
-                                game_score: score,
-                                game_level: level,
-                                game_lines: lines,
-                                game_actions: game_actions,
-                            };
+                        if score > user.best_score {
+                            let game = GameBuilder::new(&user.name)
+                                .with_score(score)
+                                .with_level(level)
+                                .with_lines(lines)
+                                .with_actions(game_actions)
+                                .build();
 
-                            // code 1011 pour une erreur de mise à jour de la partie dans la base de données
                             let res = state.game_service.upsert(&game).await;
                             if res.is_err() {
-                                close_reason.code = CloseCode::Error;
-                                close_reason.description = Some("Error upserting game".to_string());
+                                ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
+                                break;
                             }
                         }
-                        ws_session.close(Some(close_reason)).await.unwrap();
+                        ws_session.close(Some(GameCloseReason::GameEnded.to_close_reason())).await.unwrap();
                         break;
                     }
                     
@@ -122,3 +104,80 @@ async fn start_game(session: Session, state: web::Data<AppState>, req: HttpReque
 
 
 
+/*
+while let Some(msg) = stream.next().await {
+                match msg {
+                    Ok(AggregatedMessage::Binary(bin)) => {
+                        if bin.len() != 10 {
+                            // code 1008 pas sensé arriver car requête authentifiée
+                            ws_session.close(Some(GameCloseReason::InvalidMessageLength.to_close_reason())).await.unwrap();
+                            return;
+                        }
+    
+                        let game_action = Action {
+                            action_type: ActionType::from_u8(bin[0]),
+                            piece: PieceType::from_u8(bin[1]),
+                            timestamp: i64::from_be_bytes(bin[2..bin.len()].try_into().unwrap()),
+                        };
+    
+                        if game_action.action_type == ActionType::Ping {
+                            *last_ping.write().await = Instant::now();
+                            ws_session.binary(vec![0x00]).await.unwrap();
+                            continue;
+                        }
+    
+                        let result = game_engine.handle_action(&game_action);
+    
+                        game_actions.push(game_action);
+    
+                        // cheater detected
+                        if let Some(GameResult::IllegalMove) = result {
+                            ws_session.close(Some(GameCloseReason::IllegalMove.to_close_reason())).await.unwrap();
+                            break;
+                        }
+    
+                        // game ended
+                        if let Some(GameResult::Score(score,level,lines)) = result {
+    
+                            let updated_user = UserBuilder::new(&user.name)
+                                .with_games(user.number_of_games + 1)
+                                .with_score(user.best_score.max(score))
+                                .with_level(user.highest_level.max(level))
+                                .build();
+    
+                            let res = state.user_service.update(&updated_user).await;
+                            if res.is_err() {
+                                ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
+                                break;
+                            }
+    
+                            if score > user.best_score && res.is_ok() {
+                                let game = GameBuilder::new(&user.name)
+                                    .with_score(score)
+                                    .with_level(level)
+                                    .with_lines(lines)
+                                    .with_actions(game_actions)
+                                    .build();
+    
+                                let res = state.game_service.upsert(&game).await;
+                                if res.is_err() {
+                                    ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
+                                    break;
+                                }
+                            }
+                            ws_session.close(Some(GameCloseReason::GameEnded.to_close_reason())).await.unwrap();
+                            break;
+                        }
+                        
+                        let ack_response = vec![0x00];
+                        ws_session.binary(ack_response).await.unwrap();
+                    },
+                    Ok(AggregatedMessage::Close(_)) => {
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+        });
+
+*/

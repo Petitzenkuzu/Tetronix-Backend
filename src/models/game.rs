@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize, Deserializer, Serializer};
 use sqlx::FromRow;
+use actix_ws::{CloseCode, CloseReason};
 
 #[derive(Deserialize, Serialize, Debug, FromRow, PartialEq)]
 pub struct Game {
@@ -110,5 +111,45 @@ pub struct Grid {
 
 pub enum GameResult {
     Score(i32,i32,i32),
-    IllegalMove(String),
+    IllegalMove,
+}
+
+pub enum GameCloseReason {  
+    GameEnded,
+    IllegalMove,
+    InternalError,
+    InvalidMessageLength,
+    NoUserFound,
+    Timeout,
+}
+
+impl GameCloseReason {
+    pub fn to_close_reason(&self) -> CloseReason {
+        match self {
+            GameCloseReason::GameEnded => CloseReason {
+                code: CloseCode::Normal,
+                description: Some("Game ended".to_string()),
+            },
+            GameCloseReason::IllegalMove => CloseReason {
+                code: CloseCode::Error,
+                description: Some("Illegal move".to_string()),
+            },
+            GameCloseReason::InternalError => CloseReason {
+                code: CloseCode::Error,
+                description: Some("Internal error".to_string()),
+            },
+            GameCloseReason::InvalidMessageLength => CloseReason {
+                code: CloseCode::Error,
+                description: Some("Invalid message length".to_string()),
+            },
+            GameCloseReason::NoUserFound => CloseReason {
+                code: CloseCode::Policy,
+                description: Some("No user found".to_string()),
+            },
+            GameCloseReason::Timeout => CloseReason {
+                code: CloseCode::Error,
+                description: Some("Timeout".to_string()),
+            },
+        }
+    }
 }

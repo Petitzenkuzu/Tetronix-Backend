@@ -1,5 +1,5 @@
 use crate::models::{Piece, Action, ActionType, Grid, PieceType};
-
+use crate::models::GameResult;
 pub struct GameEngine {
     grid : Grid,
     current_piece : Piece,
@@ -26,7 +26,7 @@ impl GameEngine {
         }
     }
 
-    pub fn handle_action(&mut self, action : &Action) -> Option<(i32, i32, i32)> {
+    pub fn handle_action(&mut self, action : &Action) -> Option<GameResult> {
         match action.action_type {
             ActionType::Start => {
                 self.start(action.piece.clone());
@@ -35,15 +35,24 @@ impl GameEngine {
                 if self.grid.is_placeable(&self.current_piece, (self.x, self.y - 1)) {
                     self.move_left();
                 }
+                else {
+                    return Some(GameResult::IllegalMove);
+                }
             },
             ActionType::Right => {
                 if self.grid.is_placeable(&self.current_piece, (self.x, self.y + 1)) {
                     self.move_right();
                 }
+                else {
+                    return Some(GameResult::IllegalMove);
+                }
             },
             ActionType::Fall => {
                 if self.grid.is_placeable(&self.current_piece, (self.x + 1, self.y)) {
                     self.move_down();
+                }
+                else {
+                    return Some(GameResult::IllegalMove);
                 }
             },
             ActionType::HardDrop => {
@@ -55,12 +64,20 @@ impl GameEngine {
                 if self.grid.is_placeable(&new_piece, (self.x , self.y)) {
                     self.current_piece = new_piece;
                 }
+                else {
+                    return Some(GameResult::IllegalMove);
+                }
             },
             ActionType::ChangePiece => {
-                self.change_piece(action.piece.clone());
+                if !self.grid.is_placeable(&self.current_piece, (self.x+1 , self.y)) {
+                    self.change_piece(action.piece.clone());
+                }
+                else {
+                    return Some(GameResult::IllegalMove);
+                }
             },
             ActionType::End => {
-                return Some(self.end());
+                return Some(GameResult::Score(self.score, self.level, self.lines));
             },
             _ => {}
         }

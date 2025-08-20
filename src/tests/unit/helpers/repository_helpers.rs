@@ -5,7 +5,7 @@ use std::sync::OnceLock;
 use dotenv::dotenv;
 use std::env;
 use uuid::Uuid;
-use crate::tests::unit::helpers::common_helpers::GameBuilder;
+use crate::builder::game_builder::GameBuilder;
 
 static POOL: OnceLock<PgPool> = OnceLock::new();
 

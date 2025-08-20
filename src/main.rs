@@ -1,4 +1,4 @@
-use actix_web::{web::{self, Data}, App ,HttpServer,middleware::Logger, HttpResponse};
+use actix_web::{rt, web::{self, Data}, App ,HttpServer,middleware::Logger, HttpResponse};
 mod models;
 mod errors;
 mod services;
@@ -8,6 +8,7 @@ mod handlers;
 mod game_logic;
 mod config;
 mod tests;
+mod builder;
 use handlers::{github_auth, get_user, get_leaderboard, logout, get_stats, get_game, get_stats_by_owner, start_game};
 use services::{AuthService, SessionService, GameService, UserService};
 use repository::{UserRepository, SessionRepository, GameRepository};
@@ -16,12 +17,15 @@ use sqlx::postgres::PgPoolOptions;
 use models::AppState;
 use env_logger::Env;
 use config::{AuthConfig, SessionConfig, ServerConfig};
+use actix_web_prom::PrometheusMetricsBuilder;
+use prometheus::Gauge;
+use systemstat::{Platform, System};
 
 
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    
+    let sys = System::new();
     dotenv().ok();
     env_logger::init_from_env(Env::default().default_filter_or("info"));
     
@@ -32,6 +36,40 @@ async fn main() -> std::io::Result<()> {
     .connect(&server_config.database_url)
     .await
     .expect("Failed to connect to DB");
+
+    let prometheus = PrometheusMetricsBuilder::new("api")
+    .endpoint("/metrics")
+    .build()
+    .unwrap();
+
+    let mem_gauge=Gauge::new("memory_usage", "Memory usage in bytes").unwrap();
+    let cpu_gauge=Gauge::new("cpu_usage", "CPU usage in percentage").unwrap();
+
+    prometheus.registry.register(Box::new(mem_gauge.clone())).unwrap();
+    prometheus.registry.register(Box::new(cpu_gauge.clone())).unwrap();
+
+    rt::spawn(async move {
+        loop {
+            match sys.cpu_load_aggregate() {
+                Ok(cpu) => {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    let cpu = cpu.done().unwrap();
+                    cpu_gauge.set(f64::trunc(((cpu.user + cpu.system) * 100.0).into()));
+                },
+                Err(e) => {
+                    eprintln!("Error getting CPU load: {}", e);
+                }
+            }
+            match sys.memory() {
+                Ok(mem) => {
+                    let memory_used = mem.total.0 - mem.free.0;
+                    let pourcentage_used = (memory_used as f64 / mem.total.0 as f64) * 100.0;
+                    mem_gauge.set(f64::trunc(pourcentage_used));
+                }
+                Err(x) => println!("\nMemory: error: {}", x),
+            }
+        }
+    });
 
     HttpServer::new(move|| {
 
@@ -46,6 +84,7 @@ async fn main() -> std::io::Result<()> {
         
         App::new()
         .wrap(Logger::default())
+        .wrap(prometheus.clone())
         .app_data(Data::new(state))
         .default_service(web::route().to(|| async {HttpResponse::Unauthorized().body("Unauthorized")}))
         .service(

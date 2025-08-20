@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::tests::unit::helpers::{common_helpers::GameBuilder, service_helpers::ServiceTestFixture};
+    use crate::tests::unit::helpers::service_helpers::ServiceTestFixture;
+    use crate::builder::game_builder::GameBuilder;
     use crate::assert_service_not_found;
 
     #[tokio::test]

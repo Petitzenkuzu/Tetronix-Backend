@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::tests::unit::helpers::repository_helpers::RepositoryTestFixture;
-    use crate::tests::unit::helpers::common_helpers::GameBuilder;
+    use crate::builder::game_builder::GameBuilder;
     use crate::models::{GameStats};
     use crate::{assert_repository_not_found};
 
