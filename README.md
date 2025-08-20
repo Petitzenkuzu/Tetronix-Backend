@@ -15,6 +15,7 @@ Real-time Tetris-style backend, designed to be robust, testable, and production-
 ### Key Features
 - GitHub OAuth authentication with cookie-based session
 - Binary WebSocket game loop (anti-cheat, ACKs, explicit close codes)
+- Rate limiting with token bucket algorithm (configurable per endpoint)
 - Persistence: Users, Sessions, Games (actions stored as JSONB), leaderboard
 - REST API for profile, stats, and replays
 - Observability: `/metrics` endpoint (Prometheus)
@@ -106,10 +107,11 @@ Backend de jeu temps réel type Tetris, conçu pour être robuste, testable et p
 ### Principales fonctionnalités
 - **Auth GitHub OAuth** avec gestion de session par cookie
 - **WebSocket de jeu** binaire (anti-cheat, ACK, close codes explicites)
+- **Rate limiting** avec algorithme token bucket (configurable par endpoint)
 - **Persistance**: `Users`, `Sessions`, `Games`
 - **API REST** pour profil, stats, replays
 - **Observabilité**: endpoint `/metrics` (Prometheus)
-- **Tests**: unitaires et d’intégration avec fixtures SQLx
+- **Tests**: unitaires et d'intégration avec fixtures SQLx
 
 ### Endpoints REST
 - `GET /auth/github?code=...&redirect_uri=...`

@@ -76,3 +76,14 @@ impl ServerConfig {
         Self { port, database_url }
     }
 }
+
+pub struct TokenBucketConfig {
+    pub capacity: u8,
+    pub refill_rate: u8,
+}
+
+impl TokenBucketConfig {
+    pub fn new() -> Self {
+        Self { capacity : 100 , refill_rate : 1 }
+    }
+}

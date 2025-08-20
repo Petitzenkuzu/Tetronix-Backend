@@ -9,6 +9,7 @@ mod game_logic;
 mod config;
 mod tests;
 mod builder;
+use middleware::rate_limiter::RateLimiterTransform;
 use handlers::{github_auth, get_user, get_leaderboard, logout, get_stats, get_game, get_stats_by_owner, start_game};
 use services::{AuthService, SessionService, GameService, UserService};
 use repository::{UserRepository, SessionRepository, GameRepository};
@@ -86,6 +87,7 @@ async fn main() -> std::io::Result<()> {
         .wrap(Logger::default())
         .wrap(prometheus.clone())
         .app_data(Data::new(state))
+        .wrap(RateLimiterTransform)
         .default_service(web::route().to(|| async {HttpResponse::Unauthorized().body("Unauthorized")}))
         .service(
             web::scope("/auth")

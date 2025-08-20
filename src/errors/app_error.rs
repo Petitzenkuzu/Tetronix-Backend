@@ -16,6 +16,8 @@ pub enum AppError {
     Conflict(String),
     #[error("authentication failed: {0}")]
     AuthenticationFailed(String),
+    #[error("Rate limit exceeded")]
+    RateLimitExceeded,
 }
 
 impl From<ServicesError> for AppError {
@@ -51,9 +53,22 @@ impl From<ServicesError> for AppError {
 
 impl error::ResponseError for AppError {
     fn error_response(&self) -> HttpResponse {
-        HttpResponse::build(self.status_code())
-            .insert_header(ContentType::json())
-            .body(self.to_string())
+        match self {
+            AppError::RateLimitExceeded => {
+                HttpResponse::TooManyRequests()
+                .insert_header(("X-RateLimit-Limit", "100"))
+                .insert_header(("X-RateLimit-Remaining", "0"))
+                .insert_header(("Retry-After", "10"))
+                .json(serde_json::json!({
+                    "error": "Rate limit exceeded"
+                }))
+            },
+            _ => {
+                HttpResponse::build(self.status_code())
+                .insert_header(ContentType::json())
+                .body(self.to_string())   
+            }
+        }
     }
 
     fn status_code(&self) -> StatusCode {
@@ -64,6 +79,7 @@ impl error::ResponseError for AppError {
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Conflict(_) => StatusCode::CONFLICT,
             AppError::AuthenticationFailed(_) => StatusCode::UNAUTHORIZED,
+            AppError::RateLimitExceeded => StatusCode::TOO_MANY_REQUESTS,
         }
     }
 }
