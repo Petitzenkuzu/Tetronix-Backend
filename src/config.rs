@@ -84,6 +84,7 @@ pub struct TokenBucketConfig {
 
 impl TokenBucketConfig {
     pub fn new() -> Self {
+        // max 100 requests per minute, refill 1 request per second
         Self { capacity : 100 , refill_rate : 1 }
     }
 }

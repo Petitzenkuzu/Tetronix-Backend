@@ -23,6 +23,7 @@ impl TokenBucket {
     }
 
     pub fn refill(&mut self) {
+        // refill the token bucket
         let now = Instant::now();
         let time_since_last_refill = now.duration_since(self.last_refill).as_secs() as u8;
         let tokens_to_add = time_since_last_refill * self.refill_rate;
@@ -46,10 +47,12 @@ impl RateLimiter {
 
         client.refill();
 
+        // no token = no more requests, rate limit exceeded
         if client.token == 0 {
             return false;
         }
 
+        // if there is a token, use it
         client.token -= 1;
         true
     }
@@ -95,17 +98,21 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
 
+        // get the client ip
         let client_ip = match req.connection_info().peer_addr() {
             Some(ip) => Some(ip.to_string()),
             None => None,
         };
 
+        // check the limit
         if let Some(ip) = client_ip {
+            // if the limit is exceeded, return a 429 error
             if !self.rate_limiter.check_limit(ip) {
                 return Box::pin(async move {
                     Err(AppError::RateLimitExceeded.into())
                 });
             }
+            // if the limit is not exceeded, call the service
             else {
                 let fut = self.service.call(req);
 
@@ -116,6 +123,7 @@ where
             }
         }
 
+        // if no ip is found, return a 500 error
         Box::pin(async move {
             Err(AppError::InternalServerError("No IP found".to_string()).into())
         })

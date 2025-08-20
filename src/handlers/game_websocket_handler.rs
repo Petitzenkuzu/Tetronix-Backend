@@ -32,11 +32,12 @@ async fn start_game(session: Session, state: web::Data<AppState>, req: HttpReque
             match msg {
                 Ok(AggregatedMessage::Binary(bin)) => {
                     if bin.len() != 10 {
-                        // code 1008 pas sensé arriver car requête authentifiée
+                        // code 1008 should not happen because the request is authenticated
                         ws_session.close(Some(GameCloseReason::InvalidMessageLength.to_close_reason())).await.unwrap();
                         return;
                     }
 
+                    // deserialize the game action
                     let game_action = Action {
                         action_type: ActionType::from_u8(bin[0]),
                         piece: PieceType::from_u8(bin[1]),
@@ -54,7 +55,7 @@ async fn start_game(session: Session, state: web::Data<AppState>, req: HttpReque
                         break;
                     }
 
-                    // game ended
+                    // game ended, update the user and the game
                     if let Some(GameResult::Score(score,level,lines)) = result {
 
                         let updated_user = UserBuilder::new(&user.name)
@@ -69,6 +70,7 @@ async fn start_game(session: Session, state: web::Data<AppState>, req: HttpReque
                             break;
                         }
 
+                        // if the score is higher than the user's best score, insert or update the replay game in the database
                         if score > user.best_score {
                             let game = GameBuilder::new(&user.name)
                                 .with_score(score)

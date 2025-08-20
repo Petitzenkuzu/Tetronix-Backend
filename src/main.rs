@@ -49,6 +49,7 @@ async fn main() -> std::io::Result<()> {
     prometheus.registry.register(Box::new(mem_gauge.clone())).unwrap();
     prometheus.registry.register(Box::new(cpu_gauge.clone())).unwrap();
 
+    // spawn a tokio task to get the CPU and memory usage every second
     rt::spawn(async move {
         loop {
             match sys.cpu_load_aggregate() {
