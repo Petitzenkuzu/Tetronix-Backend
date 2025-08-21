@@ -11,6 +11,7 @@ use actix_web::{
     Error,
 };
 use futures_util::future::LocalBoxFuture;
+use std::time::Duration;
 
 impl TokenBucket {
     pub fn new(config: TokenBucketConfig) -> Self {
@@ -25,9 +26,14 @@ impl TokenBucket {
     pub fn refill(&mut self) {
         // refill the token bucket
         let now = Instant::now();
-        let time_since_last_refill = now.duration_since(self.last_refill).as_secs() as u8;
-        let tokens_to_add = time_since_last_refill * self.refill_rate;
-        self.token = std::cmp::min(self.token + tokens_to_add, self.capacity);
+
+        let time_since_last_refill = now.duration_since(self.last_refill);
+        let max_elapsed_time = Duration::from_secs(100);
+
+        let elapsed_secs = time_since_last_refill.min(max_elapsed_time).as_secs() as u8;
+        
+        let tokens_to_add = elapsed_secs.saturating_mul(self.refill_rate);
+        self.token = self.token.saturating_add(tokens_to_add).min(self.capacity);
         self.last_refill = now;
     }
 }
