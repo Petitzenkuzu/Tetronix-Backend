@@ -5,7 +5,7 @@ mod tests {
     use crate::tests::unit::helpers::repository_helpers::RepositoryTestFixture;
     use crate::models::User;
     use crate::{assert_repository_not_found, assert_repository_already_exists, assert_repository_invalid_input};
-    use crate::repository::UserRepository;
+    use crate::repository::{UserRepositoryTrait, UserRepository};
     #[tokio::test]
     async fn test_create_user_success() {
         let fixture = RepositoryTestFixture::new().await;

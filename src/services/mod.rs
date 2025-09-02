@@ -9,3 +9,6 @@ pub use auth_service::AuthService;
 
 mod game_service;
 pub use game_service::GameService;
+
+mod traits;
+pub use traits::*;

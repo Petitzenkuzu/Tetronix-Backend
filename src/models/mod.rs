@@ -23,7 +23,7 @@ pub use auth::GithubTokenResponse;
 pub use auth::GithubUser;
 
 mod state;
-
+pub use state::ConcreteAppState;
 pub use state::AppState;
 
 mod rate_limiter;

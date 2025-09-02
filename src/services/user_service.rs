@@ -1,17 +1,21 @@
-use crate::repository::UserRepository;
 use crate::errors::ServicesError;
 use crate::errors::RepositoryError;
 use crate::models::User;
+use crate::repository::UserRepositoryTrait;
+use crate::services::UserServiceTrait;
+
 #[derive(Clone)]
-pub struct UserService {
-    user_repo : UserRepository,
+pub struct UserService<T: UserRepositoryTrait> {
+    user_repo : T,
 }
 
-impl UserService {
-    pub fn new(user_repo: UserRepository) -> Self {
+impl<T: UserRepositoryTrait> UserService<T> {
+    pub fn new(user_repo: T) -> Self {
         Self { user_repo }
     }
+}
 
+impl<T: UserRepositoryTrait> UserServiceTrait for UserService<T> {
     /// Create a new user
     /// 
     /// # Arguments
@@ -34,7 +38,7 @@ impl UserService {
     ///     Err(e) => eprintln!("Error creating user: {}", e),
     /// }
     /// ```
-    pub async fn create(&self, name: &str) -> Result<(), ServicesError> {
+    async fn create(&self, name: &str) -> Result<(), ServicesError> {
         if name.len() < 2 {
             return Err(ServicesError::InvalidInput{field: "name".into(), message: "must be at least 2 characters long".to_string()});
         }
@@ -77,7 +81,7 @@ impl UserService {
     ///     Err(e) => eprintln!("Error updating user: {}", e),
     /// }
     /// ```
-    pub async fn update(&self, user: &User) -> Result<(), ServicesError> {
+    async fn update(&self, user: &User) -> Result<(), ServicesError> {
         user.validate()?;
         let result = self.user_repo.update_user(user).await;
         match result {
@@ -112,7 +116,7 @@ impl UserService {
     ///     Err(e) => eprintln!("Error getting user: {}", e),
     /// }
     /// ```
-    pub async fn get_by_name(&self, name: &str) -> Result<User, ServicesError> {
+    async fn get_by_name(&self, name: &str) -> Result<User, ServicesError> {
         let result =self.user_repo.get_user_by_name(name).await;
         match result {
             Ok(user) => Ok(user),
@@ -146,7 +150,7 @@ impl UserService {
     ///     Err(e) => eprintln!("Error getting users: {}", e),
     /// }
     /// ```
-    pub async fn get_top(&self, limit: i32) -> Result<Vec<User>, ServicesError> {
+    async fn get_top(&self, limit: i32) -> Result<Vec<User>, ServicesError> {
         let result = self.user_repo.get_top_users(limit).await;
         
         match result {
@@ -181,7 +185,7 @@ impl UserService {
     ///     Err(e) => eprintln!("Error deleting user: {}", e),
     /// }
     /// ```
-    pub async fn delete(&self, name: &str) -> Result<(), ServicesError> {
+    async fn delete(&self, name: &str) -> Result<(), ServicesError> {
         let result = self.user_repo.delete_user(name).await;
         match result {
             Ok(_) => Ok(()),

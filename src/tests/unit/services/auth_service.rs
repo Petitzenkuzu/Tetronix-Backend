@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::tests::unit::helpers::service_helpers::ServiceTestFixture;
-
+    use crate::services::{AuthServiceTrait, UserServiceTrait, SessionServiceTrait};
     #[tokio::test]
     async fn test_login_success() {
         let opts = mockito::ServerOpts {

@@ -3,7 +3,7 @@ mod tests {
     use crate::tests::unit::helpers::service_helpers::ServiceTestFixture;
     use crate::builder::game_builder::GameBuilder;
     use crate::assert_service_not_found;
-
+    use crate::services::{GameServiceTrait, UserServiceTrait};
     #[tokio::test]
     async fn test_upsert_success() {
         let fixture = ServiceTestFixture::new().await;

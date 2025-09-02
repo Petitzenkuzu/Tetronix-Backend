@@ -6,6 +6,7 @@ use dotenv::dotenv;
 use std::env;
 use uuid::Uuid;
 use crate::builder::game_builder::GameBuilder;
+use crate::repository::{UserRepositoryTrait, SessionRepositoryTrait, GameRepositoryTrait};
 
 static POOL: OnceLock<PgPool> = OnceLock::new();
 

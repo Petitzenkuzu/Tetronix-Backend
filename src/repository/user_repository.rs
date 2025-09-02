@@ -1,15 +1,18 @@
 use sqlx::{Pool, Postgres};
 use crate::models::User;
 use crate::errors::RepositoryError;
+use crate::repository::UserRepositoryTrait;
 #[derive(Clone)]
 pub struct UserRepository {
     pub db: Pool<Postgres>,
 }
-
 impl UserRepository {
     pub fn new(db: Pool<Postgres>) -> Self {
         Self { db }
     }
+}
+
+impl UserRepositoryTrait for UserRepository {
 
     /// Create a new user
     /// 
@@ -32,7 +35,7 @@ impl UserRepository {
     ///     Err(e) => eprintln!("Error creating user: {}", e),
     /// }
     /// ```
-    pub async fn create_user(&self, name: &str) -> Result<(), RepositoryError> {
+    async fn create_user(&self, name: &str) -> Result<(), RepositoryError> {
         let result = sqlx::query(
             "INSERT INTO users (name) VALUES ($1)",
         )
@@ -82,7 +85,7 @@ impl UserRepository {
     ///     Err(e) => eprintln!("Error updating user: {}", e),
     /// }
     /// ```
-    pub async fn update_user(&self, user: &User) -> Result<(), RepositoryError> {
+    async fn update_user(&self, user: &User) -> Result<(), RepositoryError> {
         let result = sqlx::query("UPDATE users SET best_score = $1, highest_level = $2, number_of_games = $3 WHERE name = $4")
             .bind(user.best_score)
             .bind(user.highest_level)
@@ -124,7 +127,7 @@ impl UserRepository {
     ///     Err(e) => eprintln!("Error getting user: {}", e),
     /// }
     /// ```
-    pub async fn get_user_by_name(&self, name: &str) -> Result<User, RepositoryError> {
+    async fn get_user_by_name(&self, name: &str) -> Result<User, RepositoryError> {
         let user = sqlx::query_as::<_, User>(
             "SELECT * FROM users WHERE name = $1",
         )
@@ -159,7 +162,7 @@ impl UserRepository {
     ///     Err(e) => eprintln!("Error getting users: {}", e),
     /// }
     /// ```
-    pub async fn get_top_users(&self, limit: i32) -> Result<Vec<User>, RepositoryError> {
+    async fn get_top_users(&self, limit: i32) -> Result<Vec<User>, RepositoryError> {
         if limit <= 0 || limit > 100 {
             return Err(RepositoryError::InvalidLimit{low: 0, high: 100});
         }
@@ -195,7 +198,7 @@ impl UserRepository {
     ///     Err(e) => eprintln!("Error deleting user: {}", e),
     /// }
     /// ```
-    pub async fn delete_user(&self, name: &str) -> Result<(), RepositoryError> {
+    async fn delete_user(&self, name: &str) -> Result<(), RepositoryError> {
         let result = sqlx::query("DELETE FROM users WHERE name = $1")
             .bind(name)
             .execute(&self.db)

@@ -1,6 +1,7 @@
 use crate::models::Session;
 use actix_web::{FromRequest, HttpRequest, dev::Payload, web::Data};
-use crate::models::AppState;
+use crate::models::ConcreteAppState;
+use crate::services::SessionServiceTrait;
 use crate::errors::{AppError, ServicesError};
 
 
@@ -15,7 +16,7 @@ impl FromRequest for Session {
         // if session_id cookies provided, we try to get the session from the database
         if let Some(cookie) = cookie {
 
-            let session_service = req.app_data::<Data<AppState>>().unwrap().session_service.clone();
+            let session_service = req.app_data::<Data<ConcreteAppState>>().unwrap().session_service.clone();
             
             Box::pin(async move {
                 let session = session_service.get_by_id(cookie.value()).await

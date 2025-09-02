@@ -5,6 +5,7 @@ mod tests {
     use crate::tests::integration::helper::HandlersFixture;
     use crate::models::User;
     use crate::builder::user_builder::UserBuilder;
+    use crate::services::UserServiceTrait;
     #[actix_web::test]
     async fn test_get_user_unauthorized() {
         let fixture = HandlersFixture::new().await;

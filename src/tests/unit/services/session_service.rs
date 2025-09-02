@@ -2,7 +2,7 @@
 mod tests {
     use crate::tests::unit::helpers::service_helpers::ServiceTestFixture;
     use crate::{assert_service_already_exists, assert_service_not_found, assert_service_unable_to_delete};
-
+    use crate::services::{SessionServiceTrait, UserServiceTrait};
     #[tokio::test]
     async fn test_create_session_success() {
         let fixture = ServiceTestFixture::new().await;

@@ -1,17 +1,20 @@
-use crate::repository::GameRepository;
 use crate::models::GameStats;
 use crate::errors::ServicesError;
 use crate::models::Game;
+use crate::repository::GameRepositoryTrait;
+use crate::services::traits::GameServiceTrait;
 #[derive(Clone)]
-pub struct GameService {
-    game_repository: GameRepository,
+pub struct GameService<T: GameRepositoryTrait> {
+    game_repository: T,
 }
 
-impl GameService {
-    pub fn new(game_repository: GameRepository) -> Self {
+impl<T: GameRepositoryTrait> GameService<T> {
+    pub fn new(game_repository: T) -> Self {
         Self { game_repository }
     }
+}
 
+impl<T: GameRepositoryTrait> GameServiceTrait for GameService<T> {
     /// Get the stats of a game by its owner
     /// 
     /// # Arguments
@@ -33,7 +36,7 @@ impl GameService {
     ///     Err(e) => eprintln!("Error getting stats: {}", e),
     /// }
     /// ```
-    pub async fn get_stats(&self, game_owner: &str) -> Result<GameStats, ServicesError> {
+    async fn get_stats(&self, game_owner: &str) -> Result<GameStats, ServicesError> {
         let stats = self.game_repository.get_game_stats_by_owner(game_owner).await?;
         Ok(stats)
     }
@@ -60,7 +63,7 @@ impl GameService {
     ///     Err(e) => eprintln!("Error getting game: {}", e),
     /// }
     /// ```
-    pub async fn get_by_owner(&self, game_owner: &str) -> Result<Game, ServicesError> {
+    async fn get_by_owner(&self, game_owner: &str) -> Result<Game, ServicesError> {
         let game = self.game_repository.get_game_by_owner(game_owner).await?;
         Ok(game)
     }
@@ -86,7 +89,7 @@ impl GameService {
     ///     Err(e) => eprintln!("Error upserting game: {}", e),
     /// }
     /// ```
-    pub async fn upsert(&self, game: &Game) -> Result<(), ServicesError> {
+    async fn upsert(&self, game: &Game) -> Result<(), ServicesError> {
         let res = self.game_repository.upsert_game(game).await?;
         Ok(res)
     }

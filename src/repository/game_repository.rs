@@ -4,7 +4,7 @@ use crate::models::Game;
 use crate::models::GameStats;
 use crate::models::GameJson;
 use crate::models::Action;
-
+use crate::repository::GameRepositoryTrait;
 #[derive(Clone)]
 pub struct GameRepository {
     pub db: Pool<Postgres>,
@@ -14,7 +14,9 @@ impl GameRepository {
     pub fn new(db: Pool<Postgres>) -> Self {
         Self { db }
     }
+}
 
+impl GameRepositoryTrait for GameRepository {
     /// Upsert a game
     /// 
     /// # Arguments
@@ -35,7 +37,7 @@ impl GameRepository {
     ///     Err(e) => eprintln!("Error upserting game: {}", e),
     /// }
     /// ```
-    pub async fn upsert_game(&self, game: &Game) -> Result<(), RepositoryError> {
+    async fn upsert_game(&self, game: &Game) -> Result<(), RepositoryError> {
         let actions = serde_json::to_value(&game.game_actions).map_err(|_| RepositoryError::SerializationError("Failed to serialize game actions".into()))?;
         let result = sqlx::query("INSERT INTO games (game_owner, game_score, game_level, game_lines, game_actions) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (game_owner) DO UPDATE SET game_score = EXCLUDED.game_score, game_level = EXCLUDED.game_level, game_lines = EXCLUDED.game_lines, game_actions = EXCLUDED.game_actions")
             .bind(&game.game_owner)
@@ -80,7 +82,7 @@ impl GameRepository {
     ///     Err(e) => eprintln!("Error getting game: {}", e),
     /// }
     /// ```
-    pub async fn get_game_by_owner(&self, owner: &str) -> Result<Game, RepositoryError> {
+    async fn get_game_by_owner(&self, owner: &str) -> Result<Game, RepositoryError> {
 
         let game = sqlx::query_as::<_, GameJson>("SELECT * FROM games WHERE game_owner = $1 LIMIT 1 ;")
             .bind(owner)
@@ -128,7 +130,7 @@ impl GameRepository {
     ///     Err(e) => eprintln!("Error getting stats: {}", e),
     /// }
     /// ```
-    pub async fn get_game_stats_by_owner(&self, owner: &str) -> Result<GameStats, RepositoryError> {
+    async fn get_game_stats_by_owner(&self, owner: &str) -> Result<GameStats, RepositoryError> {
 
         let game = sqlx::query_as::<_, GameStats>("SELECT game_score, game_level, game_lines FROM games WHERE game_owner = $1 LIMIT 1 ;")
             .bind(owner)

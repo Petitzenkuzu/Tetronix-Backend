@@ -11,18 +11,14 @@ mod tests;
 mod builder;
 use middleware::rate_limiter::RateLimiterTransform;
 use handlers::{github_auth, get_user, get_leaderboard, logout, get_stats, get_game, get_stats_by_owner, start_game};
-use services::{AuthService, SessionService, GameService, UserService};
-use repository::{UserRepository, SessionRepository, GameRepository};
 use dotenv::dotenv;
 use sqlx::postgres::PgPoolOptions;
-use models::AppState;
+use models::ConcreteAppState;
 use env_logger::Env;
 use config::{AuthConfig, SessionConfig, ServerConfig};
 use actix_web_prom::PrometheusMetricsBuilder;
 use prometheus::Gauge;
 use systemstat::{Platform, System};
-
-
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -68,7 +64,7 @@ async fn main() -> std::io::Result<()> {
                     let pourcentage_used = (memory_used as f64 / mem.total.0 as f64) * 100.0;
                     mem_gauge.set(f64::trunc(pourcentage_used));
                 }
-                Err(x) => println!("\nMemory: error: {}", x),
+                Err(x) => eprintln!("\nMemory: error: {}", x),
             }
         }
     });
@@ -78,11 +74,7 @@ async fn main() -> std::io::Result<()> {
         let auth_config = AuthConfig::from_env();
         let session_config = SessionConfig::from_env();
 
-        let auth_service = AuthService::new(UserRepository::new(pool.clone()), SessionRepository::new(pool.clone()), auth_config);
-        let session_service = SessionService::new(SessionRepository::new(pool.clone()), session_config);
-        let game_service = GameService::new(GameRepository::new(pool.clone()));
-        let user_service = UserService::new(UserRepository::new(pool.clone()));
-        let state = AppState { auth_service, session_service, game_service, user_service };
+        let state = ConcreteAppState::new(pool.clone(), auth_config, session_config);
         
         App::new()
         .wrap(Logger::default())

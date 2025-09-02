@@ -4,6 +4,7 @@ mod tests {
     use crate::builder::game_builder::GameBuilder;
     use crate::models::{GameStats};
     use crate::{assert_repository_not_found};
+    use crate::repository::GameRepositoryTrait;
 
     #[tokio::test]
     async fn test_upsert_get_game_success() {

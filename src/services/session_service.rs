@@ -5,19 +5,23 @@ use crate::models::Session;
 use sha2::{Sha256};
 use hmac::{Hmac, Mac};
 use crate::config::SessionConfig;
+use crate::repository::SessionRepositoryTrait;
+use crate::services::SessionServiceTrait;
 type HmacSha256 = Hmac<Sha256>;
 
 #[derive(Clone)]
-pub struct SessionService {
-    session_repo: SessionRepository,
+pub struct SessionService<T: SessionRepositoryTrait> {
+    session_repo: T,
     config: SessionConfig,
 }
 
-impl SessionService {
-    pub fn new(session_repo: SessionRepository, config: SessionConfig) -> Self {
+impl<T: SessionRepositoryTrait> SessionService<T> {
+    pub fn new(session_repo: T, config: SessionConfig) -> Self {
         Self { session_repo, config }
     }
+}
 
+impl<T: SessionRepositoryTrait> SessionServiceTrait for SessionService<T> {
     /// Hash a session ID
     /// 
     /// # Arguments
@@ -28,7 +32,7 @@ impl SessionService {
     /// 
     /// * `String` - The hashed session ID
     /// 
-    pub fn hash_session_id(&self, session_id: &str) -> String {
+    fn hash_session_id(&self, session_id: &str) -> String {
         let mut mac = HmacSha256::new_from_slice(self.config.secret_key.as_bytes())
             .expect("HMAC can take key of any size");
         mac.update(session_id.as_bytes());
@@ -57,7 +61,7 @@ impl SessionService {
     ///     Err(e) => eprintln!("Error creating session: {}", e),
     /// }
     /// ```
-    pub async fn create(&self, name: &str, session_id: &str) -> Result<(), ServicesError> {
+    async fn create(&self, name: &str, session_id: &str) -> Result<(), ServicesError> {
         let result = self.session_repo.create_session(name, &self.hash_session_id(session_id)).await;
         match result {
             Ok(_) => Ok(()),
@@ -91,7 +95,7 @@ impl SessionService {
     ///     Err(e) => println!("Error: {:?}", e),
     /// }
     /// ```
-    pub async fn get_by_id(&self, session_id: &str) -> Result<Session, ServicesError> {
+    async fn get_by_id(&self, session_id: &str) -> Result<Session, ServicesError> {
         let result = self.session_repo.get_session_by_id(&self.hash_session_id(session_id)).await;
         match result {
             Ok(session) => Ok(session),
@@ -125,7 +129,7 @@ impl SessionService {
     ///     Err(e) => eprintln!("Error deleting session: {}", e),
     /// }
     /// ```
-    pub async fn delete(&self, session_id: &str) -> Result<(), ServicesError> {
+    async fn delete(&self, session_id: &str) -> Result<(), ServicesError> {
         let result = self.session_repo.delete_session(&self.hash_session_id(session_id)).await;
         match result {
             Ok(_) => Ok(()),

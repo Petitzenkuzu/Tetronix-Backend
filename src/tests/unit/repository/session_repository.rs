@@ -2,7 +2,7 @@
 mod tests {
     use crate::tests::unit::helpers::repository_helpers::RepositoryTestFixture;
     use crate::{assert_repository_not_found, assert_repository_already_exists};
-
+    use crate::repository::{SessionRepositoryTrait, UserRepositoryTrait};
 
     #[tokio::test]
     async fn test_create_session_success() {

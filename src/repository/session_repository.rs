@@ -1,6 +1,7 @@
 use sqlx::{Pool, Postgres};
 use crate::errors::RepositoryError;
 use crate::models::Session;
+use crate::repository::SessionRepositoryTrait;
 
 #[derive(Clone)]
 pub struct SessionRepository {
@@ -11,7 +12,9 @@ impl SessionRepository {
     pub fn new(db: Pool<Postgres>) -> Self {
         Self { db }
     }
+}
 
+impl SessionRepositoryTrait for SessionRepository {
     /// Create a new session
     /// 
     /// # Arguments
@@ -34,7 +37,7 @@ impl SessionRepository {
     ///     Err(e) => eprintln!("Error creating session: {}", e),
     /// }
     /// ```
-    pub async fn create_session(&self, name: &str , session_hash: &str) -> Result<(), RepositoryError> {
+    async fn create_session(&self, name: &str , session_hash: &str) -> Result<(), RepositoryError> {
         let result = sqlx::query("INSERT INTO sessions (name, session_id) VALUES ($1, $2)")
             .bind(name)
             .bind(session_hash)
@@ -81,7 +84,7 @@ impl SessionRepository {
     ///     Err(e) => eprintln!("Error getting session: {}", e),
     /// }
     /// ```
-    pub async fn get_session_by_id(&self, session_hash: &str) -> Result<Session, RepositoryError> {
+    async fn get_session_by_id(&self, session_hash: &str) -> Result<Session, RepositoryError> {
         let session = sqlx::query_as::<_, Session>("SELECT * FROM sessions WHERE session_id = $1")
             .bind(session_hash)
             .fetch_optional(&self.db)
@@ -115,7 +118,7 @@ impl SessionRepository {
     ///     Err(e) => eprintln!("Error deleting session: {}", e),
     /// }
     /// ```
-    pub async fn delete_session(&self, session_hash: &str) -> Result<(), RepositoryError> {
+    async fn delete_session(&self, session_hash: &str) -> Result<(), RepositoryError> {
         let result = sqlx::query("DELETE FROM sessions WHERE session_id = $1")
             .bind(session_hash)
             .execute(&self.db)
@@ -154,7 +157,7 @@ impl SessionRepository {
     ///     Err(e) => eprintln!("Error deleting sessions: {}", e),
     /// }
     /// ```
-    pub async fn delete_session_by_name(&self, name: &str) -> Result<(), RepositoryError> {
+    async fn delete_session_by_name(&self, name: &str) -> Result<(), RepositoryError> {
         let result = sqlx::query("DELETE FROM sessions WHERE name = $1")
             .bind(name)
             .execute(&self.db)

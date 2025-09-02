@@ -4,6 +4,7 @@ mod tests {
     use crate::handlers::{get_user, github_auth, logout};
     use crate::tests::integration::helper::HandlersFixture;
     use crate::models::{User};
+    use crate::services::UserServiceTrait;
     #[actix_web::test]
     async fn test_github_auth_success() {
 
