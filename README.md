@@ -5,7 +5,7 @@ Real-time Tetris-style backend, designed to be robust, testable, and production-
 – Compatible app: https://github.com/Petitzenkuzu/Tetronix-MobileApp
 
 ### Technical Stack
-- Language: Rust (async/await)
+- Language: Rust
 - HTTP framework: Actix-Web
 - WebSocket: actix-ws
 - Database: PostgreSQL via SQLx (no heavy ORM)
@@ -187,5 +187,3 @@ cargo test -- --test-threads=1
   2. Ouverture du WebSocket sur `/game/start`
   3. Envoi des actions (binaire 10 octets), réception des ACK
   4. Fin de partie → persistance score + actions → leaderboard/replay
-
-
