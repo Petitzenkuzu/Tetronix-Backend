@@ -1,13 +1,88 @@
-use crate::models::{Piece, Action, ActionType, Grid, PieceType};
-use crate::models::GameResult;
+use crate::models::{Piece, ClientAction, ClientActionType, PieceType};
+use crate::game_logic::Grid;
+use crate::models::{GameResult, Action};
+use tokio::sync::mpsc::{Receiver, UnboundedSender};
+use std::time::Instant;
+use std::time::Duration;
+use crate::game_logic::PieceRng;
+use crate::models::ActionType;
+use crate::models::ServerResponse;
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct GameEngine {
     grid : Grid,
     current_piece : Piece,
-    score : i32,
+    score : u32,
     level : i32,
-    lines : i32,
+    lines : u32,
     x : i32,
     y : i32,
+    last_processed_action : u32,
+    finished : bool,
+    timestamp : u128,
+}
+
+impl GameEngine {
+    pub fn start_engine(self, mut receiver : Receiver<ClientAction>, sender : UnboundedSender<ServerResponse>) {
+        std::thread::spawn(move || {
+            let mut engine = self;
+            let mut action_queue : Vec<Action> = vec![];
+            let start = Instant::now();
+            let mut last_fall = 0_u128;
+            let mut piece_rng = PieceRng::new();
+            engine.current_piece = piece_rng.get_next_piece();
+
+            let state = match serde_json::to_string(&engine) {
+                Ok(state) => state,
+                Err(e) => {
+                    sender.send(ServerResponse::InternalServerError(e.to_string())).unwrap();
+                    return;
+                }
+            };
+
+            if let Err(e) = sender.send(ServerResponse::Start(state)) {
+                tracing::error!("Error sending start: {}", e);
+                return;
+            }
+
+            loop {
+                let mut need_to_send_state = false;
+                engine.timestamp = start.elapsed().as_millis();
+
+                while let Ok(action) = receiver.try_recv() {
+                    println!("Action received: {:?}", action);
+                }
+
+                let (action, need_to_change_piece) = engine.process_fall(last_fall, engine.timestamp);
+                if let Some(action) = action {
+                    action_queue.push(action);
+                    last_fall = engine.timestamp;
+                    need_to_send_state = true;
+                }
+                if need_to_change_piece {
+                    engine.change_piece(piece_rng.get_next_piece());
+                }
+
+                if need_to_send_state {
+                    let state = match serde_json::to_string(&engine) {
+                        Ok(state) => state,
+                        Err(e) => {
+                            tracing::error!("Error serializing grid: {}", e);
+                            sender.send(ServerResponse::InternalServerError(e.to_string())).unwrap();
+                            return;
+                        }
+                    };
+                    if let Err(e) = sender.send(ServerResponse::State(state)) {
+                        tracing::error!("Error sending state: {}", e);
+                        return;
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(16)); // 60 tick per seconds
+            }
+
+        });
+    }
 }
 
 impl GameEngine {
@@ -15,80 +90,33 @@ impl GameEngine {
         Self {
             grid: Grid::new(),
             current_piece: Piece {
-                shape: vec![vec![true, true], vec![true, true]],
-                color: "yellow".to_string(),
+                shape: vec![],
+                piece_type: PieceType::Empty,
             },
             score: 0,
             level: 1,
             lines: 0,
             x: 0,
             y: 4,
+            finished: false,
+            last_processed_action: 0,
+            timestamp: 0,
         }
     }
 
-    pub fn handle_action(&mut self, action : &Action) -> Option<GameResult> {
-        match action.action_type {
-            ActionType::Start => {
-                self.start(action.piece.clone());
-            },
-            ActionType::Left => {
-                if self.grid.is_placeable(&self.current_piece, (self.x, self.y - 1)) {
-                    self.move_left();
-                }
-                else {
-                    return Some(GameResult::IllegalMove);
-                }
-            },
-            ActionType::Right => {
-                if self.grid.is_placeable(&self.current_piece, (self.x, self.y + 1)) {
-                    self.move_right();
-                }
-                else {
-                    return Some(GameResult::IllegalMove);
-                }
-            },
-            ActionType::Fall => {
-                if self.grid.is_placeable(&self.current_piece, (self.x + 1, self.y)) {
-                    self.move_down();
-                }
-                else {
-                    return Some(GameResult::IllegalMove);
-                }
-            },
-            ActionType::HardDrop => {
-                let ghost_x = self.grid.get_ghost_x(&self.current_piece, (self.x , self.y ));
-                self.hard_drop(ghost_x);
-            },
-            ActionType::Rotate => {
-                let new_piece = Piece { shape: self.current_piece.rotate(), color: self.current_piece.color.clone() };
-                if self.grid.is_placeable(&new_piece, (self.x , self.y)) {
-                    self.current_piece = new_piece;
-                }
-                else {
-                    return Some(GameResult::IllegalMove);
-                }
-            },
-            ActionType::ChangePiece => {
-                if !self.grid.is_placeable(&self.current_piece, (self.x+1 , self.y)) {
-                    self.change_piece(action.piece.clone());
-                }
-                else {
-                    return Some(GameResult::IllegalMove);
-                }
-            },
-            ActionType::End => {
-                return Some(GameResult::Score(self.score, self.level, self.lines));
-            },
-            _ => {}
+    /// Returns a tuple containing an optional action and a boolean indicating if the we need to change current piece
+    fn process_fall(&mut self, last_fall : u128, now : u128, ) -> (Option<Action>, bool) {
+        // fall time formula 1000*(0.8**level.value)
+        if now > last_fall + (1000_f32*(0.8_f32.powi(self.level as i32))) as u128 {
+            if self.grid.is_placeable(&self.current_piece, (self.x+1 , self.y)) {
+                self.move_down();
+                return (Some(Action::new(ActionType::Fall, now, Some(self.current_piece.piece_type))), false);
+            }
+            else {
+                return (None, true);
+            }
         }
-        None
-    }
-
-    fn start(&mut self, piece : PieceType) {
-        self.current_piece = Piece::from_u8(piece.to_u8());
-        self.x = 0;
-        self.y = 4;
-        
+        (None, false)
     }
 
     fn move_left(&mut self) {
@@ -102,14 +130,15 @@ impl GameEngine {
     fn move_down(&mut self) {
         self.x += 1;
     }
+    
     fn rotate(&mut self) {
         let new_shape = self.current_piece.rotate();
-        if self.grid.is_placeable(&Piece { shape: new_shape.clone(), color: self.current_piece.color.clone() }, (self.x , self.y)) {
+        if self.grid.is_placeable(&Piece { shape: new_shape.clone(), piece_type: self.current_piece.piece_type }, (self.x , self.y)) {
             self.current_piece.shape = new_shape;
         }
     }
 
-    fn change_piece(&mut self, new_piece : PieceType) {
+    fn change_piece(&mut self, new_piece : Piece) {
         self.grid.place_piece(&self.current_piece, (self.x , self.y));
         let (lines_cleared, score) = self.grid.delete_full_rows(self.level);
         self.score += score;
@@ -117,20 +146,10 @@ impl GameEngine {
             self.level += 1;
         }
         self.lines += lines_cleared;
-        self.current_piece = Piece::from_u8(new_piece.to_u8());
+        self.current_piece = new_piece;
         self.x = 0;
         self.y = 4;
     }
-    
-    fn hard_drop(&mut self, ghost_x : i32) {
-        let diff = ghost_x - self.x;
-        self.x = ghost_x;
-        self.score += diff * (self.level * 10);
-    }
-    fn end(&mut self) -> (i32, i32, i32) {
-        return (self.score, self.level, self.lines);
-    }
-
 }
 
 

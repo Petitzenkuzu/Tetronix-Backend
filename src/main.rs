@@ -19,9 +19,18 @@ use config::{AuthConfig, SessionConfig, ServerConfig};
 use actix_web_prom::PrometheusMetricsBuilder;
 use prometheus::Gauge;
 use systemstat::{Platform, System};
+use tracing_subscriber::FmtSubscriber;
+use tracing::Level;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::INFO)
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("setting default subscriber failed");
+
     let sys = System::new();
     dotenv().ok();
     env_logger::init_from_env(Env::default().default_filter_or("info"));

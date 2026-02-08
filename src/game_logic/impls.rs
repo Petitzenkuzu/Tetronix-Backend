@@ -1,4 +1,5 @@
-use crate::models::{Piece, Grid, PieceType};
+use crate::models::{Piece, PieceType};
+use crate::game_logic::Grid;
 
 impl Piece {
     pub fn rotate(&self) -> Vec<Vec<bool>> {
@@ -9,107 +10,6 @@ impl Piece {
             }
         }
         new_shape
-    }
-
-    pub fn from_u8(binary : u8) -> Self {
-        match binary {
-            0 => Self {
-                shape: vec![
-                    vec![false, true, false, false],
-                    vec![false, true, false, false],
-                    vec![false, true, false, false],
-                    vec![false, true, false, false]
-                ],
-                color: "cyan".to_string(),
-            },
-            1 => Self {
-                shape: vec![
-                    vec![false, true, false],
-                    vec![false, true, false],
-                    vec![false, true, true]
-                ],
-                color: "blue".to_string(),
-            },
-            2 => Self {
-                shape: vec![
-                    vec![true, true], 
-                    vec![true, true]
-                ],
-                color: "yellow".to_string(),
-            },
-            3 => Self {
-                shape: vec![
-                    vec![false, true, false],
-                    vec![false, true, false],
-                    vec![true, true, false]
-                ],
-                color: "orange".to_string(),
-            },
-            4 => Self {
-                shape: vec![
-                    vec![false, true, false],
-                    vec![true, true, true],
-                    vec![false, false, false]
-                ],
-                color: "purple".to_string(),
-            },
-            5 => Self {
-                shape: vec![
-                    vec![true, true, false],
-                    vec![false, true, true],
-                    vec![false, false, false]
-                ],
-                color: "green".to_string(),
-            },
-            6 => Self {
-                shape: vec![
-                    vec![false, true, true],
-                    vec![true, true, false],
-                    vec![false, false, false]
-                ],
-                color: "red".to_string(),
-            },
-            7 => Self {
-                shape: vec![vec![false; 2]; 2],
-                color: "void".to_string(),
-            },
-            _ => Self {
-                shape: vec![vec![false; 2]; 2],
-                color: "void".to_string(),
-            },
-        }
-    }
-}
-
-use crate::models::ActionType;
-
-impl ActionType {
-    pub fn to_u8(&self) -> u8 {
-        match self {
-            ActionType::Start => 0x00,
-            ActionType::Rotate => 0x01,
-            ActionType::Right => 0x02,
-            ActionType::Left => 0x03,
-            ActionType::Fall => 0x04,
-            ActionType::HardDrop => 0x05,
-            ActionType::ChangePiece => 0x06,
-            ActionType::End => 0x07,
-            ActionType::Ping => 0xFF,
-        }
-    }
-    pub fn from_u8(binary : u8) -> Self {
-        match binary {
-            0x00 => Self::Start,
-            0x01 => Self::Rotate,
-            0x02 => Self::Right,
-            0x03 => Self::Left,
-            0x04 => Self::Fall,
-            0x05 => Self::HardDrop,
-            0x06 => Self::ChangePiece,
-            0x07 => Self::End,
-            0xFF => Self::Ping,
-            _ => Self::End,
-        }
     }
 }
 
@@ -123,7 +23,7 @@ impl PieceType {
             PieceType::Purple => 0x04,
             PieceType::Green => 0x05,
             PieceType::Red => 0x06,
-            PieceType::Void => 0x07,
+            PieceType::Empty => 0x07,
         }
     }
 
@@ -136,8 +36,8 @@ impl PieceType {
             0x04 => Self::Purple,
             0x05 => Self::Green,
             0x06 => Self::Red,
-            0x07 => Self::Void,
-            _ => Self::Void,
+            0x07 => Self::Empty,
+            _ => Self::Empty,
         }
     }
 }
@@ -145,7 +45,7 @@ impl PieceType {
 impl Grid {
     pub fn new() -> Self {
         Self {
-            grid: vec![vec![false; 10]; 20],
+            grid: vec![vec![PieceType::Empty; 10]; 20],
         }
     }
 
@@ -159,7 +59,7 @@ impl Grid {
                     if (x + i as i32) >= self.grid.len() as i32 || (y + j as i32) >= self.grid[0].len() as i32 {
                         return false;
                     }
-                    if self.grid[(x + i as i32) as usize][(y + j as i32) as usize] {
+                    if self.grid[(x + i as i32) as usize][(y + j as i32) as usize] != PieceType::Empty {
                         return false;
                     }
                 }
@@ -172,7 +72,7 @@ impl Grid {
         for i in 0..piece.shape.len(){
             for j in 0..piece.shape[i].len(){
                 if piece.shape[i][j] {
-                    self.grid[x as usize + i][(y + j as i32) as usize] = true;
+                    self.grid[x as usize + i][(y + j as i32) as usize] = piece.piece_type;
                 }
             }
         }
@@ -185,14 +85,13 @@ impl Grid {
         }
         ghost_x - 1
     }
-
-    pub fn delete_full_rows(&mut self, level : i32) -> (i32, i32) {
-        let mut lines_cleared = 0;
-        let mut score = 0;
+    pub fn delete_full_rows(&mut self, level : i32) -> (u32, u32) {
+        let mut lines_cleared = 0_u32;
+        let mut score = 0_u32;
         let mut row = (self.grid.len()-1) as i32;
-        let mut temp_grid = vec![vec![false; self.grid[0].len()]; self.grid.len()];
+        let mut temp_grid = vec![vec![PieceType::Empty; self.grid[0].len()]; self.grid.len()];
         for i in (0..self.grid.len()).rev() {
-            if self.grid[i].iter().all(|&cell| cell) {
+            if self.grid[i].iter().all(|&cell| cell != PieceType::Empty) {
                 lines_cleared += 1;
             }
             else {
@@ -201,10 +100,10 @@ impl Grid {
             }
         }
         match lines_cleared {
-            1 => score += 40 * level,
-            2 => score += 100 * level,
-            3 => score += 300 * level,
-            4 => score += 1200 * level,
+            1 => score += 40 * level as u32,
+            2 => score += 100 * level as u32,
+            3 => score += 300 * level as u32,
+            4 => score += 1200 * level as u32,
             _ => (),
         }
         self.grid = temp_grid;

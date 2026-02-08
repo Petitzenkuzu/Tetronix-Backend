@@ -1,4 +1,4 @@
-use crate::models::{Game, Action, ActionType, PieceType};
+use crate::models::{Game, Action};
 pub struct GameBuilder {
     pub game : Game
 }
@@ -11,10 +11,7 @@ impl GameBuilder {
                 game_score: 0,
                 game_level: 0,
                 game_lines: 0,
-                game_actions: vec![Action{action_type: ActionType::Start, piece: PieceType::Cyan, timestamp: 0},
-                    Action{action_type: ActionType::Fall, piece: PieceType::Cyan, timestamp: 1},
-                    Action{action_type: ActionType::End, piece: PieceType::Void, timestamp: 2},
-                ],
+                game_actions: vec![],
             }
          }
     }
