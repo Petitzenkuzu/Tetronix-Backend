@@ -52,6 +52,11 @@ impl GameEngine {
 
                 while let Ok(action) = receiver.try_recv() {
                     println!("Action received: {:?}", action);
+                    let action = engine.process_action(action.action_type, engine.timestamp);
+                    if let Some(action) = action {
+                        action_queue.push(action);
+                        need_to_send_state = true;
+                    }
                 }
 
                 let (action, need_to_change_piece) = engine.process_fall(last_fall, engine.timestamp);
@@ -119,18 +124,54 @@ impl GameEngine {
         (None, false)
     }
 
-    fn move_left(&mut self) {
-        self.y -= 1;
+    fn process_action(&mut self, action : ClientActionType, now : u128) -> Option<Action> {
+        match action {
+            ClientActionType::Right => {
+                if self.grid.is_placeable(&self.current_piece, (self.x , self.y+1)) {
+                    self.move_right();
+                    return Some(Action::new(ActionType::Right, now, Some(self.current_piece.piece_type)));
+                }
+                else {
+                    return None;
+                }
+            },
+            ClientActionType::Left => {
+                if self.grid.is_placeable(&self.current_piece, (self.x , self.y-1)) {
+                    self.move_left();
+                    return Some(Action::new(ActionType::Left, now, Some(self.current_piece.piece_type)));
+                }
+                else {
+                    return None;
+                }
+            },
+            ClientActionType::Rotate => {
+                let new_shape = self.current_piece.rotate();
+                let piece = Piece { shape: new_shape, piece_type: self.current_piece.piece_type };
+                if self.grid.is_placeable(&piece, (self.x , self.y)) {
+                    self.current_piece = piece;
+                    return Some(Action::new(ActionType::Rotate, now, Some(self.current_piece.piece_type)));
+                }
+                else {
+                    return None;
+                }
+            },
+            ClientActionType::HardDrop => None,
+            _ => return None,
+        }
     }
 
     fn move_right(&mut self) {
         self.y += 1;
     }
 
+    fn move_left(&mut self) {
+        self.y -= 1;
+    }
+    
     fn move_down(&mut self) {
         self.x += 1;
     }
-    
+
     fn rotate(&mut self) {
         let new_shape = self.current_piece.rotate();
         if self.grid.is_placeable(&Piece { shape: new_shape.clone(), piece_type: self.current_piece.piece_type }, (self.x , self.y)) {
@@ -138,7 +179,7 @@ impl GameEngine {
         }
     }
 
-    fn change_piece(&mut self, new_piece : Piece) {
+    fn change_piece(&mut self, new_piece : Piece) -> Option<Action> {
         self.grid.place_piece(&self.current_piece, (self.x , self.y));
         let (lines_cleared, score) = self.grid.delete_full_rows(self.level);
         self.score += score;
@@ -146,9 +187,16 @@ impl GameEngine {
             self.level += 1;
         }
         self.lines += lines_cleared;
-        self.current_piece = new_piece;
-        self.x = 0;
-        self.y = 4;
+        if self.grid.is_placeable(&new_piece, (self.x , self.y)) {
+            self.current_piece = new_piece;
+            self.x = 0;
+            self.y = 4;
+            return Some(Action::new(ActionType::Piece, self.timestamp, Some(self.current_piece.piece_type)));
+        }
+        else {
+            self.finished = true;
+            return None;
+        }
     }
 }
 
