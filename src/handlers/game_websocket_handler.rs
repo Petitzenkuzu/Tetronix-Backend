@@ -31,10 +31,10 @@ async fn start_game(session: Session, state: web::Data<ConcreteAppState>, req: H
             }
         };
 
-        let game_engine = GameEngine::new();
         let (sender, receiver) = tokio::sync::mpsc::channel(100);
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        game_engine.start_engine(receiver, tx);
+        let game_engine = GameEngine::new(receiver, tx);
+        game_engine.start_engine();
 
         loop {
             tokio::select! {
@@ -72,6 +72,10 @@ async fn start_game(session: Session, state: web::Data<ConcreteAppState>, req: H
                         }
                         ServerResponse::State(state) => {
                             ws_session.text(state).await.unwrap();
+                        }
+                        ServerResponse::End(state) => {
+                            ws_session.text(state).await.unwrap();
+                            break;
                         }
                         ServerResponse::MissingAction(id) => {
                             ws_session.text(id).await.unwrap();

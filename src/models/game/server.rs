@@ -29,6 +29,7 @@ impl Action {
 pub enum ServerResponse {
     Start(String),
     State(String),
+    End(String),
     MissingAction(String),
     InternalServerError(String),
 }

@@ -43,6 +43,12 @@ pub struct Piece {
     pub piece_type : PieceType
 }
 
+impl Default for Piece {
+    fn default() -> Self {
+        Self { shape: vec![], piece_type: PieceType::Empty }
+    }
+}
+
 impl From<PieceType> for Piece {
     fn from(piece_type : PieceType) -> Self {
         match piece_type {

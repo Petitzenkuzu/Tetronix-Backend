@@ -1,87 +1,94 @@
 use crate::models::{Piece, ClientAction, ClientActionType, PieceType};
-use crate::game_logic::Grid;
-use crate::models::{GameResult, Action};
+
+use crate::models::{Action};
 use tokio::sync::mpsc::{Receiver, UnboundedSender};
 use std::time::Instant;
 use std::time::Duration;
 use crate::game_logic::PieceRng;
 use crate::models::ActionType;
 use crate::models::ServerResponse;
-use serde::{Serialize, Deserialize};
+use crate::game_logic::State;
 
-#[derive(Serialize, Deserialize)]
 pub struct GameEngine {
-    grid : Grid,
-    current_piece : Piece,
-    score : u32,
-    level : i32,
-    lines : u32,
-    x : i32,
-    y : i32,
-    last_processed_action : u32,
-    finished : bool,
-    timestamp : u128,
+    state : State,
+    action_queue : Vec<Action>,
+    last_fall : u128,
+    start : Instant,
+    receiver : Receiver<ClientAction>,
+    sender : UnboundedSender<ServerResponse>,
+    need_to_send_state : bool,
 }
 
 impl GameEngine {
-    pub fn start_engine(self, mut receiver : Receiver<ClientAction>, sender : UnboundedSender<ServerResponse>) {
+    pub fn start_engine(self) {
         std::thread::spawn(move || {
             let mut engine = self;
-            let mut action_queue : Vec<Action> = vec![];
-            let start = Instant::now();
-            let mut last_fall = 0_u128;
             let mut piece_rng = PieceRng::new();
-            engine.current_piece = piece_rng.get_next_piece();
+            engine.start = Instant::now();
+            engine.last_fall = 0_u128;
+            engine.state.set_current_piece(piece_rng.get_next_piece());
+            engine.state.set_next_piece(piece_rng.get_next_piece());
 
-            let state = match serde_json::to_string(&engine) {
+            let state = match serde_json::to_string(&engine.state) {
                 Ok(state) => state,
                 Err(e) => {
-                    sender.send(ServerResponse::InternalServerError(e.to_string())).unwrap();
+                    engine.sender.send(ServerResponse::InternalServerError(e.to_string())).unwrap();
                     return;
                 }
             };
 
-            if let Err(e) = sender.send(ServerResponse::Start(state)) {
+            if let Err(e) = engine.sender.send(ServerResponse::Start(state)) {
                 tracing::error!("Error sending start: {}", e);
                 return;
             }
 
             loop {
-                let mut need_to_send_state = false;
-                engine.timestamp = start.elapsed().as_millis();
+                engine.state.timestamp = engine.start.elapsed().as_millis();
 
-                while let Ok(action) = receiver.try_recv() {
-                    println!("Action received: {:?}", action);
-                    let action = engine.process_action(action.action_type, engine.timestamp);
-                    if let Some(action) = action {
-                        action_queue.push(action);
-                        need_to_send_state = true;
+                while let Ok(action) = engine.receiver.try_recv() {
+                    if action.id < engine.state.last_processed_action {
+                        continue;
                     }
+                    if action.id > engine.state.last_processed_action + 1 {
+                        todo!("missing actions");
+                    }
+                    let piece_changed = engine.process_action(action.action_type);
+                    if piece_changed {
+                        engine.state.set_next_piece(piece_rng.get_next_piece());
+                    }
+                    engine.state.last_processed_action += 1;
                 }
 
-                let (action, need_to_change_piece) = engine.process_fall(last_fall, engine.timestamp);
-                if let Some(action) = action {
-                    action_queue.push(action);
-                    last_fall = engine.timestamp;
-                    need_to_send_state = true;
-                }
-                if need_to_change_piece {
-                    engine.change_piece(piece_rng.get_next_piece());
+                let piece_changed = engine.process_fall();
+                if piece_changed {
+                    engine.state.set_next_piece(piece_rng.get_next_piece());
                 }
 
-                if need_to_send_state {
-                    let state = match serde_json::to_string(&engine) {
+                if engine.need_to_send_state {
+                    engine.need_to_send_state = false;
+                    let state = match serde_json::to_string(&engine.state) {
                         Ok(state) => state,
                         Err(e) => {
                             tracing::error!("Error serializing grid: {}", e);
-                            sender.send(ServerResponse::InternalServerError(e.to_string())).unwrap();
+                            engine.sender.send(ServerResponse::InternalServerError(e.to_string())).unwrap();
                             return;
                         }
                     };
-                    if let Err(e) = sender.send(ServerResponse::State(state)) {
-                        tracing::error!("Error sending state: {}", e);
-                        return;
+                    match engine.state.finished {
+                        true => {
+                            if let Err(e) = engine.sender.send(ServerResponse::End(state)) {
+                                tracing::error!("Error sending end: {}", e);
+                                break;
+                            }
+                        },
+                        false => {
+                            if let Err(e) = engine.sender.send(ServerResponse::State(state)) {
+                                tracing::error!("Error sending state: {}", e);
+                                break;
+                            }
+                        },
                     }
+                    
                 }
                 std::thread::sleep(Duration::from_millis(16)); // 60 tick per seconds
             }
@@ -91,111 +98,121 @@ impl GameEngine {
 }
 
 impl GameEngine {
-    pub fn new() -> Self {
+    pub fn new(receiver : Receiver<ClientAction>, sender : UnboundedSender<ServerResponse>) -> Self {
         Self {
-            grid: Grid::new(),
-            current_piece: Piece {
-                shape: vec![],
-                piece_type: PieceType::Empty,
-            },
-            score: 0,
-            level: 1,
-            lines: 0,
-            x: 0,
-            y: 4,
-            finished: false,
-            last_processed_action: 0,
-            timestamp: 0,
+            state: State::new(),
+            action_queue: vec![],
+            last_fall: 0,
+            start: Instant::now(),
+            receiver: receiver,
+            sender: sender,
+            need_to_send_state: false,
         }
     }
 
-    /// Returns a tuple containing an optional action and a boolean indicating if the we need to change current piece
-    fn process_fall(&mut self, last_fall : u128, now : u128, ) -> (Option<Action>, bool) {
+    /// Returns a boolean indicating if the piece has been changed
+    fn process_fall(&mut self) -> bool {
         // fall time formula 1000*(0.8**level.value)
-        if now > last_fall + (1000_f32*(0.8_f32.powi(self.level as i32))) as u128 {
-            if self.grid.is_placeable(&self.current_piece, (self.x+1 , self.y)) {
+        if self.state.timestamp > self.last_fall + (1000_f32*(0.8_f32.powi(self.state.level as i32))) as u128 {
+            if self.state.grid.is_placeable(&self.state.current_piece, (self.state.x+1 , self.state.y)) {
                 self.move_down();
-                return (Some(Action::new(ActionType::Fall, now, Some(self.current_piece.piece_type))), false);
+                self.action_queue.push(Action::new(ActionType::Fall, self.state.timestamp, Some(self.state.current_piece.piece_type)));
+                self.last_fall = self.state.timestamp;
+                self.need_to_send_state = true;
+                return false;
             }
             else {
-                return (None, true);
+                self.last_fall = self.state.timestamp;
+                self.need_to_send_state = true;
+                self.change_piece();
+                return true;
             }
         }
-        (None, false)
+        false
     }
 
-    fn process_action(&mut self, action : ClientActionType, now : u128) -> Option<Action> {
+    /// Returns a boolean indicating if the piece has been changed
+    fn process_action(&mut self, action : ClientActionType) -> bool {
         match action {
             ClientActionType::Right => {
-                if self.grid.is_placeable(&self.current_piece, (self.x , self.y+1)) {
+                tracing::info!("Moving right");
+                if self.state.grid.is_placeable(&self.state.current_piece, (self.state.x , self.state.y+1)) {
                     self.move_right();
-                    return Some(Action::new(ActionType::Right, now, Some(self.current_piece.piece_type)));
+                    self.action_queue.push(Action::new(ActionType::Right, self.state.timestamp, Some(self.state.current_piece.piece_type)));
+                    self.need_to_send_state = true;
                 }
-                else {
-                    return None;
-                }
+                false
             },
             ClientActionType::Left => {
-                if self.grid.is_placeable(&self.current_piece, (self.x , self.y-1)) {
+                tracing::info!("Moving left");
+                if self.state.grid.is_placeable(&self.state.current_piece, (self.state.x , self.state.y-1)) {
                     self.move_left();
-                    return Some(Action::new(ActionType::Left, now, Some(self.current_piece.piece_type)));
+                    self.action_queue.push(Action::new(ActionType::Left, self.state.timestamp, Some(self.state.current_piece.piece_type)));
+                    self.need_to_send_state = true;
                 }
-                else {
-                    return None;
+                false
+            },
+            ClientActionType::HardDrop => {
+                tracing::info!("Hard dropping");
+                self.action_queue.push(Action::new(ActionType::HardDrop, self.state.timestamp, Some(self.state.current_piece.piece_type)));
+                let ghost_x = self.state.grid.get_ghost_x(&self.state.current_piece, (self.state.x , self.state.y));
+                let diff = ghost_x - self.state.x;
+                if diff > 0 {
+                    self.state.add_to_score((diff*(self.state.level*10)) as u32);
                 }
+                self.state.x = ghost_x;
+                self.change_piece();
+                self.need_to_send_state = true;
+                self.last_fall = self.state.timestamp;
+                true
             },
             ClientActionType::Rotate => {
-                let new_shape = self.current_piece.rotate();
-                let piece = Piece { shape: new_shape, piece_type: self.current_piece.piece_type };
-                if self.grid.is_placeable(&piece, (self.x , self.y)) {
-                    self.current_piece = piece;
-                    return Some(Action::new(ActionType::Rotate, now, Some(self.current_piece.piece_type)));
+                tracing::info!("Rotating");
+                let new_shape = self.state.current_piece.rotate();
+                let piece = Piece { shape: new_shape, piece_type: self.state.current_piece.piece_type };
+                if self.state.grid.is_placeable(&piece, (self.state.x , self.state.y)) {
+                    self.state.set_current_piece(piece);
+                    self.action_queue.push(Action::new(ActionType::Rotate, self.state.timestamp, Some(self.state.current_piece.piece_type)));
+                    self.need_to_send_state = true;
                 }
-                else {
-                    return None;
-                }
+                false
             },
-            ClientActionType::HardDrop => None,
-            _ => return None,
         }
     }
 
     fn move_right(&mut self) {
-        self.y += 1;
+        self.state.y += 1;
     }
 
     fn move_left(&mut self) {
-        self.y -= 1;
+        self.state.y -= 1;
     }
     
     fn move_down(&mut self) {
-        self.x += 1;
+        self.state.x += 1;
     }
 
-    fn rotate(&mut self) {
-        let new_shape = self.current_piece.rotate();
-        if self.grid.is_placeable(&Piece { shape: new_shape.clone(), piece_type: self.current_piece.piece_type }, (self.x , self.y)) {
-            self.current_piece.shape = new_shape;
-        }
-    }
+    fn change_piece(&mut self) {
+        let new_piece = std::mem::take(&mut self.state.next_piece);
+        self.state.grid.place_piece(&self.state.current_piece, (self.state.x , self.state.y));
+        let (lines_cleared, score) = self.state.grid.delete_full_rows(self.state.level);
+        self.state.add_to_score(score);
 
-    fn change_piece(&mut self, new_piece : Piece) -> Option<Action> {
-        self.grid.place_piece(&self.current_piece, (self.x , self.y));
-        let (lines_cleared, score) = self.grid.delete_full_rows(self.level);
-        self.score += score;
-        if self.lines%10 > (self.lines+lines_cleared)%10 {
-            self.level += 1;
+        if self.state.lines%10 > (self.state.lines+lines_cleared)%10 {
+            self.state.add_to_level(1);
         }
-        self.lines += lines_cleared;
-        if self.grid.is_placeable(&new_piece, (self.x , self.y)) {
-            self.current_piece = new_piece;
-            self.x = 0;
-            self.y = 4;
-            return Some(Action::new(ActionType::Piece, self.timestamp, Some(self.current_piece.piece_type)));
+        self.state.add_to_lines(lines_cleared);
+
+        self.state.x = 0;
+        self.state.y = 4;
+        if self.state.grid.is_placeable(&new_piece, (self.state.x , self.state.y)) {
+            self.state.set_current_piece(new_piece);
+            self.action_queue.push(Action::new(ActionType::Piece, self.state.timestamp, Some(self.state.current_piece.piece_type)));
         }
         else {
-            self.finished = true;
-            return None;
+            self.state.finished = true;
+            self.action_queue.push(Action::new(ActionType::End, self.state.timestamp, None));
+            self.need_to_send_state = true;
         }
     }
 }
