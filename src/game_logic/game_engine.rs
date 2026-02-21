@@ -8,6 +8,8 @@ use crate::game_logic::PieceRng;
 use crate::models::ActionType;
 use crate::models::ServerResponse;
 use crate::game_logic::State;
+use crate::models::Ack;
+use crate::builder::game_builder::GameBuilder;
 
 pub struct GameEngine {
     state : State,
@@ -17,6 +19,7 @@ pub struct GameEngine {
     receiver : Receiver<ClientAction>,
     sender : UnboundedSender<ServerResponse>,
     need_to_send_state : bool,
+    send_ack : bool,
 }
 
 impl GameEngine {
@@ -28,6 +31,7 @@ impl GameEngine {
             engine.last_fall = 0_u128;
             engine.state.set_current_piece(piece_rng.get_next_piece());
             engine.state.set_next_piece(piece_rng.get_next_piece());
+            engine.last_fall = 3000_u128; // we put a 3s delay at the start of the game
 
             let state = match serde_json::to_string(&engine.state) {
                 Ok(state) => state,
@@ -41,6 +45,8 @@ impl GameEngine {
                 tracing::error!("Error sending start: {}", e);
                 return;
             }
+
+            engine.action_queue.push(Action::new(ActionType::Start, engine.start.elapsed().as_millis(), Some(engine.state.current_piece.piece_type)));
 
             loop {
                 engine.state.timestamp = engine.start.elapsed().as_millis();
@@ -66,18 +72,17 @@ impl GameEngine {
 
                 if engine.need_to_send_state {
                     engine.need_to_send_state = false;
-                    let state = match serde_json::to_string(&engine.state) {
-                        Ok(state) => state,
-                        Err(e) => {
-                            tracing::error!("Error serializing grid: {}", e);
-                            engine.sender.send(ServerResponse::InternalServerError(e.to_string())).unwrap();
-                            return;
-                        }
-                    };
+                    engine.send_ack = false;
+                    let state = serde_json::to_string(&engine.state).unwrap();
                     match engine.state.finished {
                         true => {
+                            let game_builder = GameBuilder::new("").with_actions(std::mem::take(&mut engine.action_queue)).with_score(engine.state.score).with_level(engine.state.level).with_lines(engine.state.lines);
                             if let Err(e) = engine.sender.send(ServerResponse::End(state)) {
                                 tracing::error!("Error sending end: {}", e);
+                                break;
+                            }
+                            if let Err(e) = engine.sender.send(ServerResponse::Game(game_builder)) {
+                                tracing::error!("Error sending game: {}", e);
                                 break;
                             }
                         },
@@ -89,6 +94,15 @@ impl GameEngine {
                         },
                     }
                     
+                }
+                else if engine.send_ack {
+                    engine.send_ack = false;
+                    let ack = Ack::new(engine.state.last_processed_action);
+                    let ack_str = serde_json::to_string(&ack).unwrap();
+                    if let Err(e) = engine.sender.send(ServerResponse::Ack(ack_str)) {
+                        tracing::error!("Error sending ack: {}", e);
+                        break;
+                    }
                 }
                 std::thread::sleep(Duration::from_millis(16)); // 60 tick per seconds
             }
@@ -106,7 +120,8 @@ impl GameEngine {
             start: Instant::now(),
             receiver: receiver,
             sender: sender,
-            need_to_send_state: false,
+            need_to_send_state: false,  
+            send_ack: false,
         }
     }
 
@@ -118,7 +133,6 @@ impl GameEngine {
                 self.move_down();
                 self.action_queue.push(Action::new(ActionType::Fall, self.state.timestamp, Some(self.state.current_piece.piece_type)));
                 self.last_fall = self.state.timestamp;
-                self.need_to_send_state = true;
                 return false;
             }
             else {
@@ -139,7 +153,7 @@ impl GameEngine {
                 if self.state.grid.is_placeable(&self.state.current_piece, (self.state.x , self.state.y+1)) {
                     self.move_right();
                     self.action_queue.push(Action::new(ActionType::Right, self.state.timestamp, Some(self.state.current_piece.piece_type)));
-                    self.need_to_send_state = true;
+                    self.send_ack = true;
                 }
                 false
             },
@@ -148,7 +162,7 @@ impl GameEngine {
                 if self.state.grid.is_placeable(&self.state.current_piece, (self.state.x , self.state.y-1)) {
                     self.move_left();
                     self.action_queue.push(Action::new(ActionType::Left, self.state.timestamp, Some(self.state.current_piece.piece_type)));
-                    self.need_to_send_state = true;
+                    self.send_ack = true;
                 }
                 false
             },
@@ -158,7 +172,7 @@ impl GameEngine {
                 let ghost_x = self.state.grid.get_ghost_x(&self.state.current_piece, (self.state.x , self.state.y));
                 let diff = ghost_x - self.state.x;
                 if diff > 0 {
-                    self.state.add_to_score((diff*(self.state.level*10)) as u32);
+                    self.state.add_to_score(diff*(self.state.level*10));
                 }
                 self.state.x = ghost_x;
                 self.change_piece();
@@ -173,7 +187,7 @@ impl GameEngine {
                 if self.state.grid.is_placeable(&piece, (self.state.x , self.state.y)) {
                     self.state.set_current_piece(piece);
                     self.action_queue.push(Action::new(ActionType::Rotate, self.state.timestamp, Some(self.state.current_piece.piece_type)));
-                    self.need_to_send_state = true;
+                    self.send_ack = true;
                 }
                 false
             },

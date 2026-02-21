@@ -85,9 +85,9 @@ impl Grid {
         }
         ghost_x - 1
     }
-    pub fn delete_full_rows(&mut self, level : i32) -> (u32, u32) {
-        let mut lines_cleared = 0_u32;
-        let mut score = 0_u32;
+    pub fn delete_full_rows(&mut self, level : i32) -> (i32, i32) {
+        let mut lines_cleared = 0_i32;
+        let mut score = 0_i32;
         let mut row = (self.grid.len()-1) as i32;
         let mut temp_grid = vec![vec![PieceType::Empty; self.grid[0].len()]; self.grid.len()];
         for i in (0..self.grid.len()).rev() {
@@ -100,10 +100,10 @@ impl Grid {
             }
         }
         match lines_cleared {
-            1 => score += 40 * level as u32,
-            2 => score += 100 * level as u32,
-            3 => score += 300 * level as u32,
-            4 => score += 1200 * level as u32,
+            1 => score += 40 * level,
+            2 => score += 100 * level,
+            3 => score += 300 * level,
+            4 => score += 1200 * level,
             _ => (),
         }
         self.grid = temp_grid;

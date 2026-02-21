@@ -8,9 +8,9 @@ pub struct State {
     pub grid: Grid,
     pub current_piece: Piece,
     pub next_piece: Piece,
-    pub score: u32,
+    pub score: i32,
     pub level: i32,
-    pub lines: u32,
+    pub lines: i32,
     pub x: i32,
     pub y: i32,
     pub last_processed_action: u32,
@@ -49,7 +49,7 @@ impl State {
         self.next_piece = piece;
     }
 
-    pub fn add_to_score(&mut self, score : u32) {
+    pub fn add_to_score(&mut self, score : i32) {
         self.score += score;
     }
 
@@ -57,7 +57,7 @@ impl State {
         self.level += level;
     }
 
-    pub fn add_to_lines(&mut self, lines : u32) {
+    pub fn add_to_lines(&mut self, lines : i32) {
         self.lines += lines;
     }
 }

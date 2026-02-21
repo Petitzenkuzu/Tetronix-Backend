@@ -66,26 +66,25 @@ async fn start_game(session: Session, state: web::Data<ConcreteAppState>, req: H
                     }
                 }
                 Some(msg) = rx.recv() => {
-                    match msg {
-                        ServerResponse::Start(state) => {
-                            ws_session.text(state).await.unwrap();
-                        }
-                        ServerResponse::State(state) => {
-                            ws_session.text(state).await.unwrap();
-                        }
-                        ServerResponse::End(state) => {
-                            ws_session.text(state).await.unwrap();
-                            break;
-                        }
-                        ServerResponse::MissingAction(id) => {
-                            ws_session.text(id).await.unwrap();
-                        }
-                        ServerResponse::InternalServerError(e) => {
-                            tracing::error!("Internal server error: {}", e);
+                    if let ServerResponse::InternalServerError(e) = msg {
+                        tracing::error!("Internal server error: {}", e);
+                        ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
+                        break;
+                    }
+                    if let ServerResponse::Game(game_builder) = msg {
+                        let game = game_builder.with_owner(&user.name).build();
+                        let res = state.game_service.upsert(&game).await;
+                        if let Err(e) = res {
+                            tracing::error!("Error upserting game: {}", e);
                             ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
                             break;
                         }
+                        else {
+                            ws_session.close(Some(GameCloseReason::GameEnded.to_close_reason())).await.unwrap();
+                            break;
+                        }
                     }
+                    ws_session.text(serde_json::to_string(&msg).unwrap()).await.unwrap();
                 }
             }
         }

@@ -9,6 +9,7 @@ pub use game::Game;
 pub use game::GameJson;
 pub use game::GameStats;
 pub use game::Piece;
+pub use game::Ack;
 pub use game::ClientAction;
 pub use game::ClientActionType;
 pub use game::PieceType;

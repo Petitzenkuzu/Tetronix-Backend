@@ -1,6 +1,6 @@
 use crate::models::{PieceType};
 use serde::{Deserialize, Serialize};
-
+use crate::builder::game_builder::GameBuilder;
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 pub struct Action {
     action_type : ActionType,
@@ -26,10 +26,25 @@ impl Action {
     }
 }
 
+#[derive(Deserialize, Serialize)]
+pub struct Ack {
+    id : u32,
+}
+
+impl Ack {
+    pub fn new(id: u32) -> Self {
+        Self { id }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(tag = "type", content = "data")]
 pub enum ServerResponse {
     Start(String),
     State(String),
+    Ack(String),
     End(String),
+    Game(GameBuilder),
     MissingAction(String),
     InternalServerError(String),
 }

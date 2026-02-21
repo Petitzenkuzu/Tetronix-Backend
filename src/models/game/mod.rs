@@ -1,6 +1,7 @@
 mod client;
 mod server;
 
+pub use server::Ack;
 pub use server::Action;
 pub use server::ActionType;
 pub use server::ServerResponse;
