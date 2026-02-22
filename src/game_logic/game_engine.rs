@@ -20,6 +20,7 @@ pub struct GameEngine {
     sender : UnboundedSender<ServerResponse>,
     need_to_send_state : bool,
     send_ack : bool,
+    missing_actions_message_pending : Option<(u32, u128)>,
 }
 
 impl GameEngine {
@@ -41,10 +42,7 @@ impl GameEngine {
                 }
             };
 
-            if let Err(e) = engine.sender.send(ServerResponse::Start(state)) {
-                tracing::error!("Error sending start: {}", e);
-                return;
-            }
+            engine.sender.send(ServerResponse::Start(state)).unwrap();
 
             engine.action_queue.push(Action::new(ActionType::Start, engine.start.elapsed().as_millis(), Some(engine.state.current_piece.piece_type)));
 
@@ -52,12 +50,30 @@ impl GameEngine {
                 engine.state.timestamp = engine.start.elapsed().as_millis();
 
                 while let Ok(action) = engine.receiver.try_recv() {
+                    // if the action id is less than the last processed action, skip it
                     if action.id < engine.state.last_processed_action {
                         continue;
                     }
+                    // if the actions id are not consecutive, send a missing action message
                     if action.id > engine.state.last_processed_action + 1 {
-                        todo!("missing actions");
+                        engine.sender.send(ServerResponse::MissingAction(action.id.to_string())).unwrap();
+                        engine.missing_actions_message_pending = Some((engine.state.last_processed_action + 1, engine.state.timestamp));
+                        continue;
                     }
+                    // check if there is a missing action message pending and resend it if it's been too long since we asked for the missing action
+                    if let Some(missing_action) = engine.missing_actions_message_pending {
+                        if action.id != missing_action.0 {
+                            if missing_action.1 + 1000 < engine.state.timestamp {
+                                engine.sender.send(ServerResponse::MissingAction(action.id.to_string())).unwrap();
+                                engine.missing_actions_message_pending = Some((engine.state.last_processed_action + 1, engine.state.timestamp));
+                            }
+                            continue;
+                        }
+                        else {
+                            engine.missing_actions_message_pending = None;
+                        }
+                    }
+                    // process the action
                     let piece_changed = engine.process_action(action.action_type);
                     if piece_changed {
                         engine.state.set_next_piece(piece_rng.get_next_piece());
@@ -77,20 +93,11 @@ impl GameEngine {
                     match engine.state.finished {
                         true => {
                             let game_builder = GameBuilder::new("").with_actions(std::mem::take(&mut engine.action_queue)).with_score(engine.state.score).with_level(engine.state.level).with_lines(engine.state.lines);
-                            if let Err(e) = engine.sender.send(ServerResponse::End(state)) {
-                                tracing::error!("Error sending end: {}", e);
-                                break;
-                            }
-                            if let Err(e) = engine.sender.send(ServerResponse::Game(game_builder)) {
-                                tracing::error!("Error sending game: {}", e);
-                                break;
-                            }
+                            engine.sender.send(ServerResponse::End(state)).unwrap();
+                            engine.sender.send(ServerResponse::Game(game_builder)).unwrap();
                         },
                         false => {
-                            if let Err(e) = engine.sender.send(ServerResponse::State(state)) {
-                                tracing::error!("Error sending state: {}", e);
-                                break;
-                            }
+                            engine.sender.send(ServerResponse::State(state)).unwrap();
                         },
                     }
                     
@@ -99,10 +106,7 @@ impl GameEngine {
                     engine.send_ack = false;
                     let ack = Ack::new(engine.state.last_processed_action);
                     let ack_str = serde_json::to_string(&ack).unwrap();
-                    if let Err(e) = engine.sender.send(ServerResponse::Ack(ack_str)) {
-                        tracing::error!("Error sending ack: {}", e);
-                        break;
-                    }
+                    engine.sender.send(ServerResponse::Ack(ack_str)).unwrap();
                 }
                 std::thread::sleep(Duration::from_millis(16)); // 60 tick per seconds
             }
@@ -122,6 +126,7 @@ impl GameEngine {
             sender: sender,
             need_to_send_state: false,  
             send_ack: false,
+            missing_actions_message_pending: None,
         }
     }
 
