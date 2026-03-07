@@ -79,10 +79,16 @@ async fn start_game(session: Session, state: web::Data<ConcreteAppState>, req: H
                             ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
                             break;
                         }
-                        else {
-                            ws_session.close(Some(GameCloseReason::GameEnded.to_close_reason())).await.unwrap();
+                        let updated_user = UserBuilder::new(&user.name).with_score(std::cmp::max(user.best_score, game.game_score)).with_level(std::cmp::max(user.highest_level, game.game_level)).with_games(user.number_of_games + 1).build();
+                        let res = state.user_service.update(&updated_user).await;
+                        if let Err(e) = res {
+                            tracing::error!("Error updating user: {}", e);
+                            ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
                             break;
                         }
+
+                        ws_session.close(Some(GameCloseReason::GameEnded.to_close_reason())).await.unwrap();
+                        break;
                     }
                     ws_session.text(serde_json::to_string(&msg).unwrap()).await.unwrap();
                 }

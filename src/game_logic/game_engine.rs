@@ -1,4 +1,4 @@
-use crate::models::{Piece, ClientAction, ClientActionType, PieceType};
+use crate::models::{Piece, ClientAction, ClientActionType};
 
 use crate::models::{Action};
 use tokio::sync::mpsc::{Receiver, UnboundedSender};
