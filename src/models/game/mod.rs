@@ -1,3 +1,14 @@
+mod client;
+mod server;
+
+pub use server::Ack;
+pub use server::Action;
+pub use server::ActionType;
+pub use server::ServerResponse;
+
+pub use client::ClientAction;
+pub use client::ClientActionType;
+
 use serde::{Deserialize, Serialize, Deserializer, Serializer};
 use sqlx::FromRow;
 use actix_ws::{CloseCode, CloseReason};
@@ -30,50 +41,47 @@ pub struct GameStats {
 #[derive(Deserialize, Serialize, Debug, Clone, FromRow, PartialEq)]
 pub struct Piece {
     pub shape : Vec<Vec<bool>>,
-    pub color : String
+    pub piece_type : PieceType
 }
 
-#[derive(Deserialize, Serialize, Debug, FromRow, PartialEq)]
-pub struct Action {
-    pub action_type : ActionType,
-    pub piece : PieceType,
-    pub timestamp : i64
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-#[repr(u8)]
-pub enum ActionType {
-    Start = 0x00,
-    Rotate = 0x01,
-    Right = 0x02,
-    Left = 0x03,
-    Fall = 0x04,
-    HardDrop = 0x05,
-    ChangePiece = 0x06,
-    End = 0x07,
-    Ping = 0xFF,
-}
-
-impl Serialize for ActionType {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_u8(self.to_u8())
+impl Default for Piece {
+    fn default() -> Self {
+        Self { shape: vec![], piece_type: PieceType::Empty }
     }
 }
 
-impl<'de> Deserialize<'de> for ActionType {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = u8::deserialize(deserializer)?;
-        Ok(Self::from_u8(value))
+impl From<PieceType> for Piece {
+    fn from(piece_type : PieceType) -> Self {
+        match piece_type {
+            PieceType::Cyan => Piece { shape: vec![vec![false, true, false, false], vec![false, true, false, false], vec![false, true, false, false], vec![false, true, false, false]], piece_type: PieceType::Cyan },
+            PieceType::Blue => Piece { shape: vec![vec![false, true, false], vec![false, true, false], vec![false, true, true]], piece_type: PieceType::Blue },
+            PieceType::Yellow => Piece { shape: vec![vec![true, true], vec![true, true]], piece_type: PieceType::Yellow },
+            PieceType::Orange => Piece { shape: vec![vec![false, true, false], vec![false, true, false], vec![true, true, false]], piece_type: PieceType::Orange },
+            PieceType::Purple => Piece { shape: vec![vec![false, true, false], vec![true, true, true], vec![false, false, false]], piece_type: PieceType::Purple },
+            PieceType::Green => Piece { shape: vec![vec![true, true, false], vec![false, true, true], vec![false, false, false]], piece_type: PieceType::Green },
+            PieceType::Red => Piece { shape: vec![vec![false, true, true], vec![true, true, false], vec![false, false, false]], piece_type: PieceType::Red },
+            PieceType::Empty => Piece { shape: vec![], piece_type: PieceType::Empty },
+        }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+impl From<u8> for PieceType {
+    fn from(value : u8) -> Self {
+        match value {
+            0x00 => PieceType::Cyan,
+            0x01 => PieceType::Blue,
+            0x02 => PieceType::Yellow,
+            0x03 => PieceType::Orange,
+            0x04 => PieceType::Purple,
+            0x05 => PieceType::Green,
+            0x06 => PieceType::Red,
+            0x07 => PieceType::Empty,
+            _ => PieceType::Empty,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
 #[repr(u8)]
 pub enum PieceType {
     Cyan = 0x00,
@@ -83,7 +91,7 @@ pub enum PieceType {
     Purple = 0x04,
     Green = 0x05,
     Red = 0x06,
-    Void = 0x07,
+    Empty = 0x07,
 }
 
 impl Serialize for PieceType {
@@ -103,10 +111,6 @@ impl<'de> Deserialize<'de> for PieceType {
         let value = u8::deserialize(deserializer)?;
         Ok(Self::from_u8(value))
     }
-}
-
-pub struct Grid {
-    pub grid : Vec<Vec<bool>>
 }
 
 pub enum GameResult {

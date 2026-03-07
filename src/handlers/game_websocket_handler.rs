@@ -10,6 +10,8 @@ use crate::ConcreteAppState;
 use crate::builder::{game_builder::GameBuilder, user_builder::UserBuilder};
 use crate::services::UserServiceTrait;
 use crate::services::GameServiceTrait;
+use crate::models::ClientAction;
+use crate::models::ServerResponse;
 
 #[get("/start")]
 async fn start_game(session: Session, state: web::Data<ConcreteAppState>, req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, AppError> {
@@ -21,83 +23,69 @@ async fn start_game(session: Session, state: web::Data<ConcreteAppState>, req: H
 
 
     rt::spawn(async move {
-        let user = state.user_service.get_by_name(&session.name).await;
-        if user.is_err() {
-            ws_session.close(Some(GameCloseReason::NoUserFound.to_close_reason())).await.unwrap();
-             return;
-        }
-        let user = user.unwrap();
-        let mut game_engine = GameEngine::new();
-        let mut game_actions : Vec<Action> = Vec::new();
+        let user = match state.user_service.get_by_name(&session.name).await {
+            Ok(user) => user,
+            Err(e) => {
+                ws_session.close(Some(GameCloseReason::NoUserFound.to_close_reason())).await.unwrap();
+                return;
+            }
+        };
 
-        while let Some(msg) = stream.next().await {
-            match msg {
-                Ok(AggregatedMessage::Binary(bin)) => {
-                    if bin.len() != 10 {
-                        // code 1008 should not happen because the request is authenticated
-                        ws_session.close(Some(GameCloseReason::InvalidMessageLength.to_close_reason())).await.unwrap();
-                        return;
-                    }
+        let (sender, receiver) = tokio::sync::mpsc::channel(100);
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let game_engine = GameEngine::new(receiver, tx);
+        game_engine.start_engine();
 
-                    // deserialize the game action
-                    let game_action = Action {
-                        action_type: ActionType::from_u8(bin[0]),
-                        piece: PieceType::from_u8(bin[1]),
-                        timestamp: i64::from_be_bytes(bin[2..bin.len()].try_into().unwrap()),
-                    };
+        loop {
+            tokio::select! {
+                Some(msg) = stream.next() => {
+                    match msg {
+                        Ok(AggregatedMessage::Binary(bin)) => {
+                            // action type (1 byte) + id (4 bytes)
+                            if bin.len() != 5 {
+                                ws_session.close(Some(GameCloseReason::InvalidMessageLength.to_close_reason())).await.unwrap();
+                                return;
+                            }
+                            let action = match ClientAction::try_from(bin) {
+                                Ok(action) => action,
+                                Err(_e) => {
+                                    continue;
+                                }
+                            };
 
-                    let result = game_engine.handle_action(&game_action);
-
-                    game_actions.push(game_action);
-
-                    // cheater detected
-                    if let Some(GameResult::IllegalMove) = result {
-                        println!("Illegal move");
-                        ws_session.close(Some(GameCloseReason::IllegalMove.to_close_reason())).await.unwrap();
-                        break;
-                    }
-
-                    // game ended, update the user and the game
-                    if let Some(GameResult::Score(score,level,lines)) = result {
-
-                        let updated_user = UserBuilder::new(&user.name)
-                            .with_games(user.number_of_games + 1)
-                            .with_score(user.best_score.max(score))
-                            .with_level(user.highest_level.max(level))
-                            .build();
-
-                        let res = state.user_service.update(&updated_user).await;
-                        if res.is_err() {
-                            ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
-                            break;
-                        }
-
-                        // if the score is higher than the user's best score, insert or update the replay game in the database
-                        if score > user.best_score {
-                            let game = GameBuilder::new(&user.name)
-                                .with_score(score)
-                                .with_level(level)
-                                .with_lines(lines)
-                                .with_actions(game_actions)
-                                .build();
-
-                            let res = state.game_service.upsert(&game).await;
-                            if res.is_err() {
+                            if let Err(_e) = sender.send(action).await {
+                                tracing::error!("Game engine channel closed unexpectedly");
                                 ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
                                 break;
                             }
                         }
-                        ws_session.close(Some(GameCloseReason::GameEnded.to_close_reason())).await.unwrap();
+                        Ok(AggregatedMessage::Close(_)) => {
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+                Some(msg) = rx.recv() => {
+                    if let ServerResponse::InternalServerError(e) = msg {
+                        tracing::error!("Internal server error: {}", e);
+                        ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
                         break;
                     }
-                    
-                    let ack_response = vec![0x00];
-                    ws_session.binary(ack_response).await.unwrap();
-                },
-                Ok(AggregatedMessage::Close(_)) => {
-                    break;
+                    if let ServerResponse::Game(game_builder) = msg {
+                        let game = game_builder.with_owner(&user.name).build();
+                        let res = state.game_service.upsert(&game).await;
+                        if let Err(e) = res {
+                            tracing::error!("Error upserting game: {}", e);
+                            ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
+                            break;
+                        }
+                        else {
+                            ws_session.close(Some(GameCloseReason::GameEnded.to_close_reason())).await.unwrap();
+                            break;
+                        }
+                    }
+                    ws_session.text(serde_json::to_string(&msg).unwrap()).await.unwrap();
                 }
-                _ => {}
             }
         }
     });
