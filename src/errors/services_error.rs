@@ -19,6 +19,8 @@ pub enum ServicesError {
     UnableToDeserialize{what: String},
     #[error("Authentication Failed : {reason}")]
     AuthenticationFailed{reason: String},
+    #[error("Invalid JWT: {reason}")]
+    InvalidJWT{reason: String},
 }
 
 impl From<RepositoryError> for ServicesError {

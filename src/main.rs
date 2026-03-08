@@ -21,6 +21,7 @@ use prometheus::Gauge;
 use systemstat::{Platform, System};
 use tracing_subscriber::FmtSubscriber;
 use tracing::Level;
+use middleware::auth_middleware::Auth;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -96,15 +97,17 @@ async fn main() -> std::io::Result<()> {
             .service(github_auth)
             .service(logout)
         )
-        .service(get_user)
-        .service(get_leaderboard)
-        .service(
-            web::scope("/game")
-            .default_service(web::route().to(|| async {HttpResponse::Unauthorized().body("Unauthorized")}))
-            .service(get_stats)
-            .service(get_stats_by_owner)
-            .service(get_game)
-            .service(start_game)
+        .service(web::scope("").wrap(Auth)
+            .service(get_user)
+            .service(get_leaderboard)
+            .service(
+                web::scope("/game")
+                .default_service(web::route().to(|| async {HttpResponse::Unauthorized().body("Unauthorized")}))
+                .service(get_stats)
+                .service(get_stats_by_owner)
+                .service(get_game)
+                .service(start_game)
+            )
         )
     }).workers(4)
     .bind(("0.0.0.0", server_config.port))?

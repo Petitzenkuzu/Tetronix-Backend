@@ -24,6 +24,8 @@ mod auth;
 pub use auth::GithubCredentials;
 pub use auth::GithubTokenResponse;
 pub use auth::GithubUser;
+pub use auth::Claims;
+pub use auth::AuthenticatedUser;
 
 mod state;
 pub use state::ConcreteAppState;

@@ -10,8 +10,8 @@ use crate::services::SessionServiceTrait;
 #[get("/github")]
 pub async fn github_auth(state: Data<ConcreteAppState>, query: web::Query<GithubCredentials>, _req: HttpRequest) -> Result<impl Responder, AppError> {
 
-    let session_id = state.auth_service.authenticate_with_github(&query.code, &query.redirect_uri).await.map_err(|e| AppError::AuthenticationFailed(e.to_string()))?;
-    let cookie = state.auth_service.create_cookies(&session_id);
+    let jwt = state.auth_service.authenticate_with_github(&query.code, &query.redirect_uri).await.map_err(|e| AppError::AuthenticationFailed(e.to_string()))?;
+    let cookie = state.auth_service.create_cookies(jwt);
     
     Ok(HttpResponse::Ok()
         .cookie(cookie)
