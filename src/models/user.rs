@@ -71,9 +71,3 @@ impl User {
         Ok(())
     }
 }
-
-#[derive(Deserialize, Serialize, Debug, Clone, FromRow)]
-pub struct Session {
-    pub name: String,
-    pub session_id: String,
-}

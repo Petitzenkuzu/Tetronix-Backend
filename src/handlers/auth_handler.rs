@@ -1,10 +1,9 @@
 use actix_web::{web, Responder, HttpRequest, get, HttpResponse, post};
 use crate::models::GithubCredentials;
 use actix_web::web::Data;
-use crate::models::{ConcreteAppState, Session};
+use crate::models::{ConcreteAppState};
 use crate::errors::AppError;
 use crate::services::AuthServiceTrait;
-use crate::services::SessionServiceTrait;
 
 
 #[get("/github")]
@@ -19,11 +18,7 @@ pub async fn github_auth(state: Data<ConcreteAppState>, query: web::Query<Github
 }
 
 #[post("/logout")]
-pub async fn logout(session: Session, state: Data<ConcreteAppState>, _req: HttpRequest) -> impl Responder {
-    if let Err(_e) = state.session_service.delete(&session.session_id).await {
-        return HttpResponse::InternalServerError().body("Failed to logout");
-    }
-    
+pub async fn logout(state: Data<ConcreteAppState>, _req: HttpRequest) -> impl Responder {
     let cookie = state.auth_service.logout_cookies();
     HttpResponse::Ok()
         .cookie(cookie)

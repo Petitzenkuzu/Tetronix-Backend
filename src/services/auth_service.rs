@@ -1,30 +1,28 @@
-use crate::repository::{SessionRepository};
+
 use crate::errors::ServicesError;
 use crate::models::*;
 use crate::errors::RepositoryError;
 use crate::config::AuthConfig;
 use reqwest::Client;
-use uuid;
 use actix_web::cookie::{SameSite, Cookie};
 use sha2::{Sha256};
 use hmac::{Hmac, Mac};
-use crate::repository::{UserRepositoryTrait, SessionRepositoryTrait};
+use crate::repository::{UserRepositoryTrait};
 use crate::services::AuthServiceTrait;
 use chrono::{Utc, Duration};
 use jsonwebtoken::{encode, Header, EncodingKey, decode, Validation, DecodingKey};
 type HmacSha256 = Hmac<Sha256>;
 
 #[derive(Clone)]
-pub struct AuthService<T: UserRepositoryTrait, S: SessionRepositoryTrait> {
+pub struct AuthService<T: UserRepositoryTrait> {
     user_repository : T,
-    session_repository : S,
     config: AuthConfig,
 }
 
 
-impl<T: UserRepositoryTrait, S: SessionRepositoryTrait> AuthService<T, S> {
-    pub fn new(user_repository: T, session_repository: S, config: AuthConfig) -> Self {
-        Self { user_repository, session_repository, config }
+impl<T: UserRepositoryTrait> AuthService<T> {
+    pub fn new(user_repository: T, config: AuthConfig) -> Self {
+        Self { user_repository, config }
     }
 
     /// Exchange a code for an access token
@@ -176,7 +174,7 @@ impl<T: UserRepositoryTrait, S: SessionRepositoryTrait> AuthService<T, S> {
 
 }
 
-impl<T: UserRepositoryTrait, S: SessionRepositoryTrait> AuthServiceTrait for AuthService<T, S> {
+impl<T: UserRepositoryTrait> AuthServiceTrait for AuthService<T> {
 
     /// Create logout cookies
     /// 

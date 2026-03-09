@@ -63,7 +63,7 @@ where
 
         let username = match app_state.auth_service.verify_jwt(&auth_token.value()) {
             Ok(username) => username,
-            Err(e) => return Box::pin(async move {
+            Err(_) => return Box::pin(async move {
                 Err(AppError::Unauthorized.into())
             })
         };

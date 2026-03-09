@@ -1,13 +1,7 @@
 use crate::errors::ServicesError;
 use crate::models::User;
-use crate::models::Session;
 use crate::models::Game;
 use crate::models::GameStats;
-use crate::repository::UserRepositoryTrait;
-use crate::repository::SessionRepositoryTrait;
-use crate::config::SessionConfig;
-use crate::repository::GameRepositoryTrait;
-use crate::config::AuthConfig;
 use actix_web::cookie::Cookie;
 
 pub trait UserServiceTrait: Clone {
@@ -16,13 +10,6 @@ pub trait UserServiceTrait: Clone {
     async fn get_by_name(&self, name: &str) -> Result<User, ServicesError>;
     async fn get_top(&self, limit: i32) -> Result<Vec<User>, ServicesError>;
     async fn delete(&self, name: &str) -> Result<(), ServicesError>;
-}
-
-pub trait SessionServiceTrait: Clone {
-    fn hash_session_id(&self, session_id: &str) -> String;
-    async fn create(&self, name: &str, session_hash: &str) -> Result<(), ServicesError>;
-    async fn get_by_id(&self, session_hash: &str) -> Result<Session, ServicesError>;
-    async fn delete(&self, session_hash: &str) -> Result<(), ServicesError>;
 }
 
 pub trait GameServiceTrait: Clone {
