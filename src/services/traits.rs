@@ -33,7 +33,7 @@ pub trait GameServiceTrait: Clone {
 
 pub trait AuthServiceTrait: Clone {
     async fn authenticate_with_github(&self, code: &str, redirect_uri: &str) -> Result<String, ServicesError>;
-    fn create_cookies(&self, jwt: String) -> Cookie;
-    fn logout_cookies(&self) -> Cookie;
+    fn create_cookies(&self, jwt: String) -> Cookie<'_>;
+    fn logout_cookies(&self) -> Cookie<'_>;
     fn verify_jwt(&self, jwt: &str) -> Result<String, ServicesError>;
 }

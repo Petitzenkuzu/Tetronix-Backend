@@ -157,7 +157,7 @@ impl<T: UserRepositoryTrait, S: SessionRepositoryTrait> AuthService<T, S> {
     fn create_jwt(&self, username: String) -> Result<String, ServicesError> {
         let expiration = Utc::now()
             .checked_add_signed(Duration::days(7))
-            .unwrap()
+            .ok_or(ServicesError::InternalServerError("Something went wrong".to_string()))?
             .timestamp() as usize;
     
         let claims = Claims {
@@ -289,6 +289,9 @@ impl<T: UserRepositoryTrait, S: SessionRepositoryTrait> AuthServiceTrait for Aut
     fn verify_jwt(&self, jwt: &str) -> Result<String, ServicesError> {
         let claims = decode::<Claims>(jwt, &DecodingKey::from_secret(self.config.session_secret_key.as_ref()), &Validation::default())
             .map_err(|e| ServicesError::InvalidJWT{reason: format!("Invalid JWT: {}", e)})?;
+        if claims.claims.exp < Utc::now().timestamp() as usize {
+            return Err(ServicesError::InvalidJWT{reason: "JWT expired".to_string()});
+        }
         Ok(claims.claims.username)
     }
 
