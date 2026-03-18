@@ -5,6 +5,10 @@ mod tests {
     use crate::tests::integration::helper::HandlersFixture;
     use crate::models::{User};
     use crate::services::UserServiceTrait;
+    use crate::middleware::auth_middleware::Auth;
+    use actix_web::dev::Service;
+    use crate::errors::AppError;
+
     #[actix_web::test]
     async fn test_github_auth_success() {
 
@@ -33,7 +37,7 @@ mod tests {
 
         let fixture = HandlersFixture::new().await;
 
-        let app = test::init_service(App::new().app_data(web::Data::new(fixture.app_state.clone())).service(github_auth).service(logout).service(get_user)).await;
+        let app = test::init_service(App::new().app_data(web::Data::new(fixture.app_state.clone())).service(github_auth).service(logout).service(web::scope("").wrap(Auth).service(get_user))).await;
 
         let req = test::TestRequest::get().uri("/github?code=test_code&redirect_uri=test_redirect_uri").to_request();
 
@@ -54,10 +58,14 @@ mod tests {
         let req = test::TestRequest::post().uri("/logout").cookie(cookie.clone()).to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
+        let cookie = resp.headers().get("Set-Cookie").unwrap();
+        let cookie = Cookie::parse(cookie.to_str().unwrap()).unwrap();
 
         let req = test::TestRequest::get().uri("/user").cookie(cookie).to_request();
-        let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        let resp = app.call(req).await;
+        assert!(resp.is_err());
+        let error = resp.err().unwrap().error_response();
+        assert_eq!(error.status(), StatusCode::UNAUTHORIZED);
 
         let _ = fixture.app_state.user_service.delete("test_user").await.unwrap();
 

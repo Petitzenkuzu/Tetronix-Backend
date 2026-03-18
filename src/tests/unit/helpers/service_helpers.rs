@@ -1,6 +1,6 @@
 use crate::models::Game;
-use crate::services::{UserService, SessionService, GameService, AuthService};
-use crate::repository::{UserRepository, SessionRepository, GameRepository};
+use crate::services::{UserService, GameService, AuthService};
+use crate::repository::{UserRepository, GameRepository};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::sync::OnceLock;
@@ -8,8 +8,8 @@ use dotenv::dotenv;
 use std::env;
 use uuid::Uuid;
 use crate::builder::game_builder::GameBuilder;
-use crate::config::{SessionConfig, AuthConfig};
-use crate::services::{UserServiceTrait, SessionServiceTrait, GameServiceTrait, AuthServiceTrait};
+use crate::config::AuthConfig;
+use crate::services::{UserServiceTrait, GameServiceTrait};
 static POOL: OnceLock<PgPool> = OnceLock::new();
 
 async fn get_pool() -> &'static PgPool {
@@ -34,9 +34,8 @@ pub struct ServiceTestFixture
 {   
     pub pool: &'static PgPool,
     pub user_service: UserService<UserRepository>,
-    pub session_service: SessionService<SessionRepository>,
     pub game_service: GameService<GameRepository>,
-    pub auth_service: AuthService<UserRepository, SessionRepository>,
+    pub auth_service: AuthService<UserRepository>,
 }
 
 impl ServiceTestFixture 
@@ -44,23 +43,17 @@ impl ServiceTestFixture
     pub async fn new() -> Self {
         let pool = get_pool().await;
         let user_repo = UserRepository::new(pool.clone());
-        let session_repo = SessionRepository::new(pool.clone());
         let game_repo = GameRepository::new(pool.clone());
         Self {
             pool,
             user_service: UserService::new(user_repo.clone()),
-            session_service: SessionService::new(session_repo.clone(), SessionConfig::from_env()),
             game_service: GameService::new(game_repo),
-            auth_service: AuthService::new(user_repo, session_repo, AuthConfig::from_env()),
+            auth_service: AuthService::new(user_repo, AuthConfig::from_env()),
         }
     }
 
     pub fn random_user_name(&self) -> String {
         format!("test_user_{}", Uuid::new_v4())
-    }
-    
-    pub fn random_session_hash(&self) -> String {
-        format!("test_session_{}", Uuid::new_v4())
     }
 
     pub async fn with_test_user<F, Fut, R> (&self, test_fn : F) -> R
@@ -73,24 +66,6 @@ impl ServiceTestFixture
 
         let result = test_fn(username.clone(), self.user_service.clone()).await;
         
-        let _ = self.user_service.delete(&username).await;
-        result
-    }
-
-    pub async fn with_test_user_and_session<F, Fut, R> (&self, test_fn : F) -> R
-    where 
-        F: FnOnce(String, String, UserService<UserRepository>, SessionService<SessionRepository>) -> Fut,
-        Fut: std::future::Future<Output = R>,
-    {
-        let username = self.random_user_name();
-        let _ =self.user_service.create(&username).await.expect("Failed to create test user");
-
-        let session_hash = self.random_session_hash();
-        let _ = self.session_service.create(&username, &session_hash).await.expect("Failed to create test session");
-
-        let result = test_fn(username.clone(), session_hash.clone(), self.user_service.clone(), self.session_service.clone()).await;
-        
-        let _ = self.session_service.delete(&session_hash).await;
         let _ = self.user_service.delete(&username).await;
         result
     }

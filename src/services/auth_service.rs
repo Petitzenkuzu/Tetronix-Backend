@@ -152,7 +152,7 @@ impl<T: UserRepositoryTrait> AuthService<T> {
         }
     }
 
-    fn create_jwt(&self, username: String) -> Result<String, ServicesError> {
+    pub fn create_jwt(&self, username: String) -> Result<String, ServicesError> {
         let expiration = Utc::now()
             .checked_add_signed(Duration::days(7))
             .ok_or(ServicesError::InternalServerError("Something went wrong".to_string()))?
