@@ -1,46 +1,28 @@
-use crate::repository::{SessionRepository};
+
 use crate::errors::ServicesError;
 use crate::models::*;
 use crate::errors::RepositoryError;
 use crate::config::AuthConfig;
 use reqwest::Client;
-use uuid;
 use actix_web::cookie::{SameSite, Cookie};
 use sha2::{Sha256};
 use hmac::{Hmac, Mac};
-use crate::repository::{UserRepositoryTrait, SessionRepositoryTrait};
+use crate::repository::{UserRepositoryTrait};
 use crate::services::AuthServiceTrait;
+use chrono::{Utc, Duration};
+use jsonwebtoken::{encode, Header, EncodingKey, decode, Validation, DecodingKey};
 type HmacSha256 = Hmac<Sha256>;
 
 #[derive(Clone)]
-pub struct AuthService<T: UserRepositoryTrait, S: SessionRepositoryTrait> {
+pub struct AuthService<T: UserRepositoryTrait> {
     user_repository : T,
-    session_repository : S,
     config: AuthConfig,
 }
 
 
-impl<T: UserRepositoryTrait, S: SessionRepositoryTrait> AuthService<T, S> {
-    pub fn new(user_repository: T, session_repository: S, config: AuthConfig) -> Self {
-        Self { user_repository, session_repository, config }
-    }
-
-    /// Hash a session ID
-    /// 
-    /// # Arguments
-    /// 
-    /// * `session_id` - The original session ID to hash
-    /// 
-    /// # Returns
-    /// 
-    /// * `String` - The hashed session ID
-    /// 
-    fn hash_session_id(&self, session_id: &str) -> String {
-        let mut mac = HmacSha256::new_from_slice(self.config.session_secret_key.as_bytes())
-            .expect("HMAC can take key of any size");
-        mac.update(session_id.as_bytes());
-        let result : String = format!("{:x}", mac.finalize().into_bytes());
-        result
+impl<T: UserRepositoryTrait> AuthService<T> {
+    pub fn new(user_repository: T, config: AuthConfig) -> Self {
+        Self { user_repository, config }
     }
 
     /// Exchange a code for an access token
@@ -170,57 +152,29 @@ impl<T: UserRepositoryTrait, S: SessionRepositoryTrait> AuthService<T, S> {
         }
     }
 
-    /// Delete zombie sessions for a user
-    /// 
-    /// # Arguments
-    /// 
-    /// * `username` - The name of the user to delete the zombie sessions for
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// let auth_service = AuthService::new(UserRepository::new(db_pool), SessionRepository::new(db_pool), config);
-    /// auth_service.delete_zombie_session("john_doe").await;
-    /// ```
-    async fn delete_zombie_session(&self, username: &str) {
-        let _ = self.session_repository.delete_session_by_name(&username).await;
-    }
+    pub fn create_jwt(&self, username: String) -> Result<String, ServicesError> {
+        let expiration = Utc::now()
+            .checked_add_signed(Duration::days(7))
+            .ok_or(ServicesError::InternalServerError("Something went wrong".to_string()))?
+            .timestamp() as usize;
     
-    /// Create a new session for a user
-    /// 
-    /// # Arguments
-    /// 
-    /// * `username` - The name of the user to create a session for
-    /// 
-    /// # Returns
-    /// 
-    /// * `Ok(session_id)` - If the session has been created successfully
-    /// * `Err(ServicesError::AuthenticationFailed)` - If the session creation failed
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// let auth_service = AuthService::new(UserRepository::new(db_pool), SessionRepository::new(db_pool), config);
-    /// match auth_service.create_session_for_user("john_doe").await {
-    ///     Ok(session_id) => println!("Session created successfully with id: {}", session_id),
-    ///     Err(e) => eprintln!("Error creating session: {}", e),
-    /// }
-    /// ```
-    async fn create_session_for_user(&self, username: &str) -> Result<String, ServicesError> {
-        let session_id = uuid::Uuid::new_v4().to_string();
-        let session_hash = self.hash_session_id(&session_id);
-        self.session_repository.create_session(username, &session_hash).await
-            .map_err(|e| ServicesError::AuthenticationFailed {
-                reason: format!("Failed to create session: {}", e)
-            })?;
-        
-        Ok(session_id)
+        let claims = Claims {
+            username: username,
+            exp: expiration,
+        };
+    
+        let jwt = encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(self.config.session_secret_key.as_ref()),
+        ).map_err(|_| ServicesError::InternalServerError(format!("Something went wrong")))?;
+        Ok(jwt)
     }
 
 
 }
 
-impl<T: UserRepositoryTrait, S: SessionRepositoryTrait> AuthServiceTrait for AuthService<T, S> {
+impl<T: UserRepositoryTrait> AuthServiceTrait for AuthService<T> {
 
     /// Create logout cookies
     /// 
@@ -237,8 +191,8 @@ impl<T: UserRepositoryTrait, S: SessionRepositoryTrait> AuthServiceTrait for Aut
     /// let cookie = auth_service.logout_cookies();
     /// println!("Cookie: {:?}", cookie);
     /// ```
-    fn logout_cookies(&self) -> Cookie {
-        let mut cookie = Cookie::new("session_id", "");
+    fn logout_cookies(&self) -> Cookie<'_> {
+        let mut cookie = Cookie::new("auth_token", "");
         cookie.set_path("/");
         cookie.set_http_only(true);
         cookie.set_secure(self.config.production);
@@ -261,16 +215,16 @@ impl<T: UserRepositoryTrait, S: SessionRepositoryTrait> AuthServiceTrait for Aut
     /// 
     /// ```
     /// let auth_service = AuthService::new(UserRepository::new(db_pool), SessionRepository::new(db_pool), config);
-    /// let cookie = auth_service.create_cookies("session_id");
+    /// let cookie = auth_service.create_cookies("jwt");
     /// println!("Cookie: {:?}", cookie);
     /// ```
-    fn create_cookies(&self, session_id: &str) -> Cookie {
-        let mut cookie = Cookie::new("session_id", session_id.to_string());
+    fn create_cookies(&self, jwt: String) -> Cookie<'_> {
+        let mut cookie = Cookie::new("auth_token", jwt);
         cookie.set_path("/");
         cookie.set_http_only(true);
         cookie.set_secure(self.config.production);
         cookie.set_same_site(SameSite::Lax);
-        cookie.set_max_age(actix_web::cookie::time::Duration::days(7));
+        cookie.set_max_age(None);
         cookie
     }
 
@@ -304,13 +258,39 @@ impl<T: UserRepositoryTrait, S: SessionRepositoryTrait> AuthServiceTrait for Aut
         //Ensure user exists, it will create it if it doesn't exist
         self.ensure_user_exists(&github_user.login).await?;
 
-        //Ensure there is no zombie session for this user
-        self.delete_zombie_session(&github_user.login).await;
-
-        //Create new session
-        let session_id = self.create_session_for_user(&github_user.login).await?;
+        //Create JWT
+        let jwt = self.create_jwt(github_user.login)?;
         
-        Ok(session_id)
+        Ok(jwt)
+    }
+
+    /// Verify a JWT
+    /// 
+    /// # Arguments
+    /// 
+    /// * `jwt` - The JWT to verify
+    /// 
+    /// # Returns
+    /// 
+    /// * `Ok(username)` - If the JWT has been verified successfully
+    /// * `Err(ServicesError::InvalidJWT)` - If the JWT is invalid
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// let auth_service = AuthService::new(UserRepository::new(db_pool), SessionRepository::new(db_pool), config);
+    /// match auth_service.verify_jwt("jwt").await {
+    ///     Ok(username) => println!("JWT verified successfully for user: {}", username),
+    ///     Err(e) => eprintln!("Error verifying JWT: {}", e),
+    /// }
+    /// ```
+    fn verify_jwt(&self, jwt: &str) -> Result<String, ServicesError> {
+        let claims = decode::<Claims>(jwt, &DecodingKey::from_secret(self.config.session_secret_key.as_ref()), &Validation::default())
+            .map_err(|e| ServicesError::InvalidJWT{reason: format!("Invalid JWT: {}", e)})?;
+        if claims.claims.exp < Utc::now().timestamp() as usize {
+            return Err(ServicesError::InvalidJWT{reason: "JWT expired".to_string()});
+        }
+        Ok(claims.claims.username)
     }
 
 }

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::tests::unit::helpers::service_helpers::ServiceTestFixture;
-    use crate::services::{AuthServiceTrait, UserServiceTrait, SessionServiceTrait};
+    use crate::services::{AuthServiceTrait, UserServiceTrait};
     #[tokio::test]
     async fn test_login_success() {
         let opts = mockito::ServerOpts {
@@ -29,15 +29,13 @@ mod tests {
 
         let fixture = ServiceTestFixture::new().await;
 
-        let session_id = fixture.auth_service.authenticate_with_github("test_code", "redirect_uri").await;
-        assert!(session_id.is_ok());
-        let session_id = session_id.unwrap();
+        let jwt_token = fixture.auth_service.authenticate_with_github("test_code", "redirect_uri").await;
+        assert!(jwt_token.is_ok());
+        let jwt_token = jwt_token.unwrap();
         let user = fixture.user_service.get_by_name("test_user").await.unwrap();
-        let session = fixture.session_service.get_by_id(&session_id).await.unwrap();
-
         assert_eq!(user.name, "test_user");
-        assert_eq!(session.name, "test_user");
-
+        let verified_user = fixture.auth_service.verify_jwt(&jwt_token).expect("Failed to verify JWT, should be a valid JWT");
+        assert_eq!(verified_user, "test_user");
         std::env::remove_var("GITHUB_TEST_URL");
 
         assert!(fixture.user_service.delete("test_user").await.is_ok());

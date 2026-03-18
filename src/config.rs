@@ -46,23 +46,6 @@ impl AuthConfig {
     }
 }
 
-#[derive(Clone)]
-pub struct SessionConfig {
-    pub secret_key: String
-}
-
-impl SessionConfig {
-    pub fn from_env() -> Self {
-        let secret_key = env::var("SESSION_SECRET_KEY")
-            .unwrap_or_else(|_| {
-                eprintln!("WARNING: SESSION_SECRET_KEY environment variable not set");
-                String::new()
-            });
-
-        Self { secret_key }
-    }
-}
-
 pub struct ServerConfig {
     pub port: u16,
     pub database_url: String

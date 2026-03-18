@@ -1,4 +1,4 @@
-use crate::repository::{UserRepository, SessionRepository, GameRepository};
+use crate::repository::{UserRepository, GameRepository};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::sync::OnceLock;
@@ -6,7 +6,7 @@ use dotenv::dotenv;
 use std::env;
 use uuid::Uuid;
 use crate::builder::game_builder::GameBuilder;
-use crate::repository::{UserRepositoryTrait, SessionRepositoryTrait, GameRepositoryTrait};
+use crate::repository::{UserRepositoryTrait, GameRepositoryTrait};
 
 static POOL: OnceLock<PgPool> = OnceLock::new();
 
@@ -29,7 +29,6 @@ async fn get_pool() -> &'static PgPool {
 pub struct RepositoryTestFixture {
     pub pool: &'static PgPool,
     pub user_repo: UserRepository,
-    pub session_repo: SessionRepository,
     pub game_repo: GameRepository,
 }
 
@@ -39,17 +38,12 @@ impl RepositoryTestFixture {
         Self {
             pool,
             user_repo: UserRepository::new(pool.clone()),
-            session_repo: SessionRepository::new(pool.clone()),
             game_repo: GameRepository::new(pool.clone()),
         }
     }
     
     pub fn random_user_name(&self) -> String {
         format!("test_user_{}", Uuid::new_v4())
-    }
-    
-    pub fn random_session_hash(&self) -> String {
-        format!("test_session_{}", Uuid::new_v4())
     }
     
     pub async fn with_test_user<F, Fut, R>(&self, test_fn: F) -> R
@@ -86,32 +80,6 @@ impl RepositoryTestFixture {
 
         let result = test_fn(username.clone(), self.user_repo.clone(), self.game_repo.clone()).await;
         
-        let _ = self.user_repo.delete_user(&username).await;
-        
-        result
-    }
-    
-    pub async fn with_test_user_and_session<F, Fut, R>(&self, test_fn: F) -> R
-    where
-        F: FnOnce(String, String, UserRepository, SessionRepository) -> Fut,
-        Fut: std::future::Future<Output = R>,
-    {
-        let username = self.random_user_name();
-        let session_hash = self.random_session_hash();
-        
-        self.user_repo.create_user(&username).await
-            .expect("Failed to create test user");
-        self.session_repo.create_session(&username, &session_hash).await
-            .expect("Failed to create test session");
-        
-        let result = test_fn(
-            username.clone(), 
-            session_hash.clone(), 
-            self.user_repo.clone(),
-            self.session_repo.clone()
-        ).await;
-        
-        let _ = self.session_repo.delete_session(&session_hash).await;
         let _ = self.user_repo.delete_user(&username).await;
         
         result

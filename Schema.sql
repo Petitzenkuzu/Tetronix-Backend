@@ -5,12 +5,6 @@ CREATE TABLE Users (
     highest_level INT DEFAULT 0 CHECK (highest_level >= 0)
 );
 
-CREATE TABLE Sessions (
-    name VARCHAR(255) NOT NULL,
-    session_id VARCHAR(64) Primary Key,
-    FOREIGN KEY (name) REFERENCES Users(name) ON DELETE CASCADE
-);
-
 CREATE TABLE Games (
     game_owner VARCHAR(255) Primary Key,
     game_score INT NOT NULL DEFAULT 0 CHECK (game_score >= 0),

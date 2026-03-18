@@ -3,18 +3,16 @@ use actix_web::{rt, web};
 use crate::errors::AppError;
 use actix_ws::{AggregatedMessage};
 use futures_util::StreamExt as _;
-use crate::models::{Session, GameResult, GameCloseReason};
-use crate::models::{Action, ActionType, PieceType};
+use crate::models::{GameCloseReason, AuthenticatedUser};
 use crate::game_logic::GameEngine;
 use crate::ConcreteAppState;
-use crate::builder::{game_builder::GameBuilder, user_builder::UserBuilder};
 use crate::services::UserServiceTrait;
 use crate::services::GameServiceTrait;
 use crate::models::ClientAction;
 use crate::models::ServerResponse;
 
 #[get("/start")]
-async fn start_game(session: Session, state: web::Data<ConcreteAppState>, req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, AppError> {
+async fn start_game(authenticated_user: AuthenticatedUser, state: web::Data<ConcreteAppState>, req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, AppError> {
     let (res, mut ws_session, stream) = actix_ws::handle(&req, stream).map_err(|_| AppError::InternalServerError("Failed to start game".to_string()))?;
 
     let mut stream = stream
@@ -23,9 +21,9 @@ async fn start_game(session: Session, state: web::Data<ConcreteAppState>, req: H
 
 
     rt::spawn(async move {
-        let user = match state.user_service.get_by_name(&session.name).await {
+        let user = match state.user_service.get_by_name(&authenticated_user.username).await {
             Ok(user) => user,
-            Err(e) => {
+            Err(_) => {
                 ws_session.close(Some(GameCloseReason::NoUserFound.to_close_reason())).await.unwrap();
                 return;
             }

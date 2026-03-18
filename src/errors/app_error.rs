@@ -47,6 +47,9 @@ impl From<ServicesError> for AppError {
             ServicesError::InternalServerError(_) => {
                 AppError::InternalServerError("Something went wrong".to_string())
             },
+            ServicesError::InvalidJWT { reason } => {
+                AppError::InternalServerError("Something went wrong".to_string())
+            },
         }
     }
 }

@@ -7,20 +7,21 @@ mod middleware;
 mod handlers;
 mod game_logic;
 mod config;
-mod tests;
 mod builder;
+mod tests;
 use middleware::rate_limiter::RateLimiterTransform;
 use handlers::{github_auth, get_user, get_leaderboard, logout, get_stats, get_game, get_stats_by_owner, start_game};
 use dotenv::dotenv;
 use sqlx::postgres::PgPoolOptions;
 use models::ConcreteAppState;
 use env_logger::Env;
-use config::{AuthConfig, SessionConfig, ServerConfig};
+use config::{AuthConfig, ServerConfig};
 use actix_web_prom::PrometheusMetricsBuilder;
 use prometheus::Gauge;
 use systemstat::{Platform, System};
 use tracing_subscriber::FmtSubscriber;
 use tracing::Level;
+use middleware::auth_middleware::Auth;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -81,9 +82,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move|| {
 
         let auth_config = AuthConfig::from_env();
-        let session_config = SessionConfig::from_env();
-
-        let state = ConcreteAppState::new(pool.clone(), auth_config, session_config);
+        let state = ConcreteAppState::new(pool.clone(), auth_config);
         
         App::new()
         .wrap(Logger::default())
@@ -96,15 +95,17 @@ async fn main() -> std::io::Result<()> {
             .service(github_auth)
             .service(logout)
         )
-        .service(get_user)
-        .service(get_leaderboard)
-        .service(
-            web::scope("/game")
-            .default_service(web::route().to(|| async {HttpResponse::Unauthorized().body("Unauthorized")}))
-            .service(get_stats)
-            .service(get_stats_by_owner)
-            .service(get_game)
-            .service(start_game)
+        .service(web::scope("").wrap(Auth)
+            .service(get_user)
+            .service(get_leaderboard)
+            .service(
+                web::scope("/game")
+                .default_service(web::route().to(|| async {HttpResponse::Unauthorized().body("Unauthorized")}))
+                .service(get_stats)
+                .service(get_stats_by_owner)
+                .service(get_game)
+                .service(start_game)
+            )
         )
     }).workers(4)
     .bind(("0.0.0.0", server_config.port))?
