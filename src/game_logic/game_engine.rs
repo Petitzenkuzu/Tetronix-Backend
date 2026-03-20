@@ -154,7 +154,6 @@ impl GameEngine {
     fn process_action(&mut self, action : ClientActionType) -> bool {
         match action {
             ClientActionType::Right => {
-                tracing::info!("Moving right");
                 if self.state.grid.is_placeable(&self.state.current_piece, (self.state.x , self.state.y+1)) {
                     self.move_right();
                     self.action_queue.push(Action::new(ActionType::Right, self.state.timestamp, Some(self.state.current_piece.piece_type)));
@@ -163,7 +162,6 @@ impl GameEngine {
                 false
             },
             ClientActionType::Left => {
-                tracing::info!("Moving left");
                 if self.state.grid.is_placeable(&self.state.current_piece, (self.state.x , self.state.y-1)) {
                     self.move_left();
                     self.action_queue.push(Action::new(ActionType::Left, self.state.timestamp, Some(self.state.current_piece.piece_type)));
@@ -172,7 +170,6 @@ impl GameEngine {
                 false
             },
             ClientActionType::HardDrop => {
-                tracing::info!("Hard dropping");
                 self.action_queue.push(Action::new(ActionType::HardDrop, self.state.timestamp, Some(self.state.current_piece.piece_type)));
                 let ghost_x = self.state.grid.get_ghost_x(&self.state.current_piece, (self.state.x , self.state.y));
                 let diff = ghost_x - self.state.x;
@@ -186,7 +183,6 @@ impl GameEngine {
                 true
             },
             ClientActionType::Rotate => {
-                tracing::info!("Rotating");
                 let new_shape = self.state.current_piece.rotate();
                 let piece = Piece { shape: new_shape, piece_type: self.state.current_piece.piece_type };
                 if self.state.grid.is_placeable(&piece, (self.state.x , self.state.y)) {

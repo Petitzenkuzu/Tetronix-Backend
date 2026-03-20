@@ -68,7 +68,6 @@ where
             })
         };
 
-        info!("User {} authenticated", &username);
         req.extensions_mut().insert(AuthenticatedUser { username });
         
         let fut = self.service.call(req);
