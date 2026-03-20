@@ -40,6 +40,9 @@ jobs:
         toolchain: stable
         profile: minimal
     
+    - name: Init database schema
+      run: PGPASSWORD=password psql -h localhost -U user -d test_db -f Schema.sql
+
     - name: Build
       run: cargo build
 
