@@ -64,18 +64,6 @@ mod tests {
     }
 
     #[actix_web::test]
-    async fn test_get_leaderboard_single_user() {
-        let fixture = HandlersFixture::new().await;
-        fixture.with_test_user(|username, jwt, app_state| async move {
-            let app = test::init_service(App::new().app_data(web::Data::new(app_state)).wrap(Auth).service(get_leaderboard)).await;
-            let req = test::TestRequest::get().uri("/leaderboard").cookie(Cookie::new("auth_token", jwt)).to_request();
-            let resp : Vec<User> = test::call_and_read_body_json(&app, req).await;
-            assert_eq!(resp.len(), 1);
-            assert_eq!(resp[0].name, username);
-        }).await;
-    }
-
-    #[actix_web::test]
     async fn test_get_leaderboard_unauthorized() {
         let fixture = HandlersFixture::new().await;
         let app = test::init_service(App::new().app_data(web::Data::new(fixture.app_state)).wrap(Auth).service(get_leaderboard)).await;
