@@ -9,7 +9,7 @@ mod tests {
     };
     #[tokio::test]
     async fn test_create_user_success() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         fixture
             .with_test_user(|username, user_service| async move {
                 assert!(user_service.get_by_name(&username).await.is_ok());
@@ -19,7 +19,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_invalid_input() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         assert_service_invalid_input!(fixture.user_service.create("").await);
         assert_service_invalid_input!(fixture.user_service.create("a").await);
         assert_service_invalid_input!(fixture.user_service.create(&"a".repeat(51)).await);
@@ -27,7 +27,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_already_exists() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         fixture
             .with_test_user(|username, user_service| async move {
                 assert_service_already_exists!(user_service.create(&username).await);
@@ -37,7 +37,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_user_by_name_success() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         fixture
             .with_test_user(|username, user_service| async move {
                 let user = user_service.get_by_name(&username).await.unwrap();
@@ -51,14 +51,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_user_by_name_not_found() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         let username = fixture.random_user_name();
         assert_service_not_found!(fixture.user_service.get_by_name(&username).await);
     }
 
     #[tokio::test]
     async fn test_update_user_success() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         fixture
             .with_test_user(|username, user_service| async move {
                 let mut user = user_service.get_by_name(&username).await.unwrap();
@@ -76,7 +76,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_user_not_found() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         let user = User {
             name: fixture.random_user_name(),
             number_of_games: 0,
@@ -88,7 +88,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_user_invalid_input() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         let user = User {
             name: "".to_string(),
             number_of_games: 0,
@@ -128,7 +128,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_top_users_success() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         let username2 = fixture.random_user_name();
         let username3 = fixture.random_user_name();
         fixture
@@ -174,14 +174,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_top_users_invalid_input() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         assert_service_invalid_input!(fixture.user_service.get_top(-1).await);
         assert_service_invalid_input!(fixture.user_service.get_top(101).await);
     }
 
     #[tokio::test]
     async fn test_delete_user_success() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         fixture
             .with_test_user(|_username, _user_service| async move {
                 // no need to create a user, it's already created and deleted in the fixture
@@ -191,7 +191,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_user_not_found() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         let username = fixture.random_user_name();
         assert_service_unable_to_delete!(fixture.user_service.delete(&username).await);
     }

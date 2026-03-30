@@ -30,9 +30,13 @@ pub struct HandlersFixture {
 }
 
 impl HandlersFixture {
-    pub async fn new() -> Self {
+    pub async fn new(github_test_url: Option<String>) -> Self {
         let pool = get_pool().await;
-        let app_state = ConcreteAppState::new(pool.clone(), AuthConfig::from_env());
+        let auth_config = match github_test_url {
+            Some(url) => AuthConfig::with_github_url(url),
+            None => AuthConfig::from_env(),
+        };
+        let app_state = ConcreteAppState::new(pool.clone(), auth_config);
         Self { app_state }
     }
 

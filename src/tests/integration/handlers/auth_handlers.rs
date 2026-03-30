@@ -32,9 +32,7 @@ mod tests {
             .expect(1)
             .create();
 
-        std::env::set_var("GITHUB_TEST_URL", server.url());
-
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(Some(server.url())).await;
 
         let app = test::init_service(
             App::new()
@@ -90,7 +88,5 @@ mod tests {
             .delete("test_user")
             .await
             .unwrap();
-
-        std::env::remove_var("GITHUB_TEST_URL");
     }
 }

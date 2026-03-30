@@ -6,7 +6,7 @@ mod tests {
     use crate::tests::unit::helpers::service_helpers::ServiceTestFixture;
     #[tokio::test]
     async fn test_upsert_success() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         fixture
             .with_test_user_and_game(|username, game, _user_service, game_service| async move {
                 let received_game = game_service.get_by_owner(&username).await.unwrap();
@@ -27,7 +27,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_by_owner_success() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         fixture
             .with_test_user_and_game(|username, game, _user_service, game_service| async move {
                 let received_game = game_service.get_by_owner(&username).await.unwrap();
@@ -38,14 +38,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_by_owner_not_found() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         let username = fixture.random_user_name();
         assert_service_not_found!(fixture.game_service.get_by_owner(&username).await);
     }
 
     #[tokio::test]
     async fn test_get_stats_success() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         fixture
             .with_test_user_and_game(|username, game, _user_service, game_service| async move {
                 let stats = game_service.get_stats(&username).await.unwrap();
@@ -58,7 +58,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_stats_not_found() {
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(None).await;
         let username = fixture.random_user_name();
         assert_service_not_found!(fixture.game_service.get_stats(&username).await);
     }

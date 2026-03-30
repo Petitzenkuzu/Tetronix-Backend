@@ -9,7 +9,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_stats_unauthorized() {
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(None).await;
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(fixture.app_state))
@@ -23,7 +23,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_stats_success() {
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(None).await;
         fixture
             .with_test_user_and_game(|_username, jwt, game, app_state| async move {
                 let app = test::init_service(
@@ -46,7 +46,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_stats_not_found() {
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(None).await;
         fixture
             .with_test_user(|_username, _jwt, app_state| async move {
                 let other_jwt = app_state
@@ -72,7 +72,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_stats_by_owner_success() {
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(None).await;
         fixture
             .with_test_user_and_game(|username, jwt, game, app_state| async move {
                 let app = test::init_service(
@@ -95,7 +95,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_stats_by_owner_not_found() {
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(None).await;
         fixture
             .with_test_user_and_game(|_username, jwt, _game, app_state| async move {
                 let app = test::init_service(
@@ -117,7 +117,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_stats_by_owner_unauthorized() {
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(None).await;
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(fixture.app_state))
@@ -136,7 +136,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_game_success() {
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(None).await;
         fixture
             .with_test_user_and_game(|username, jwt, game, app_state| async move {
                 let app = test::init_service(
@@ -158,7 +158,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_game_not_found() {
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(None).await;
         fixture
             .with_test_user_and_game(|_username, jwt, _game, app_state| async move {
                 let app = test::init_service(
@@ -180,7 +180,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_game_unauthorized() {
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(None).await;
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(fixture.app_state))

@@ -57,7 +57,7 @@ impl<T: UserRepositoryTrait> AuthService<T> {
         let client = Client::new();
         let mut url = String::from("https://github.com/login/oauth/access_token");
         // test url for unit tests
-        if let Some(test_url) = &self.config.github_test_url {
+        if let Some(test_url) = &self.config.github_url_override {
             url = format!("{}/login/oauth/access_token", test_url);
         }
 
@@ -113,7 +113,7 @@ impl<T: UserRepositoryTrait> AuthService<T> {
         let client = Client::new();
         let mut url = String::from("https://api.github.com/user");
         // test url for unit tests
-        if let Some(test_url) = &self.config.github_test_url {
+        if let Some(test_url) = &self.config.github_url_override {
             url = format!("{}/user", test_url);
         }
 

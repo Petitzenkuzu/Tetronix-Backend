@@ -35,14 +35,18 @@ pub struct ServiceTestFixture {
 }
 
 impl ServiceTestFixture {
-    pub async fn new() -> Self {
+    pub async fn new(github_test_url: Option<String>) -> Self {
         let pool = get_pool().await;
         let user_repo = UserRepository::new(pool.clone());
         let game_repo = GameRepository::new(pool.clone());
+        let auth_config = match github_test_url {
+            Some(url) => AuthConfig::with_github_url(url),
+            None => AuthConfig::from_env(),
+        };
         Self {
             user_service: UserService::new(user_repo.clone()),
             game_service: GameService::new(game_repo),
-            auth_service: AuthService::new(user_repo, AuthConfig::from_env()),
+            auth_service: AuthService::new(user_repo, auth_config),
         }
     }
 

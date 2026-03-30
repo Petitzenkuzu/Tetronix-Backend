@@ -6,7 +6,7 @@ pub struct AuthConfig {
     pub github_client_id: String,
     pub github_client_secret: String,
     pub session_secret_key: String,
-    pub github_test_url: Option<String>,
+    pub github_url_override: Option<String>,
 }
 
 impl AuthConfig {
@@ -31,14 +31,41 @@ impl AuthConfig {
             String::new()
         });
 
-        let github_test_url = env::var("GITHUB_TEST_URL").ok();
+        Self {
+            production,
+            github_client_id,
+            github_client_secret,
+            session_secret_key,
+            github_url_override: None,
+        }
+    }
+    pub fn with_github_url(github_url_override: String) -> Self {
+        let production = env::var("PRODUCTION")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
+
+        let github_client_id = env::var("GITHUB_CLIENT_ID").unwrap_or_else(|_| {
+            eprintln!("WARNING: GITHUB_CLIENT_ID environment variable not set");
+            String::new()
+        });
+
+        let github_client_secret = env::var("GITHUB_CLIENT_SECRET").unwrap_or_else(|_| {
+            eprintln!("WARNING: GITHUB_CLIENT_SECRET environment variable not set");
+            String::new()
+        });
+
+        let session_secret_key = env::var("SESSION_SECRET_KEY").unwrap_or_else(|_| {
+            eprintln!("WARNING: SESSION_SECRET_KEY environment variable not set");
+            String::new()
+        });
 
         Self {
             production,
             github_client_id,
             github_client_secret,
             session_secret_key,
-            github_test_url,
+            github_url_override: Some(github_url_override),
         }
     }
 }

@@ -26,9 +26,7 @@ mod tests {
             .expect(1)
             .create();
 
-        std::env::set_var("GITHUB_TEST_URL", server.url());
-
-        let fixture = ServiceTestFixture::new().await;
+        let fixture = ServiceTestFixture::new(Some(server.url())).await;
 
         let jwt_token = fixture
             .auth_service
@@ -43,7 +41,6 @@ mod tests {
             .verify_jwt(&jwt_token)
             .expect("Failed to verify JWT, should be a valid JWT");
         assert_eq!(verified_user, "test_user");
-        std::env::remove_var("GITHUB_TEST_URL");
 
         assert!(fixture.user_service.delete("test_user").await.is_ok());
     }

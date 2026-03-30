@@ -11,7 +11,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_user_unauthorized() {
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(None).await;
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(fixture.app_state))
@@ -28,7 +28,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_user_success() {
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(None).await;
         fixture
             .with_test_user(|username, jwt, app_state| async move {
                 let app = test::init_service(
@@ -50,7 +50,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_leaderboard_success() {
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(None).await;
 
         let username2 = fixture.random_user_name();
         let username3 = fixture.random_user_name();
@@ -138,7 +138,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_leaderboard_unauthorized() {
-        let fixture = HandlersFixture::new().await;
+        let fixture = HandlersFixture::new(None).await;
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(fixture.app_state))
