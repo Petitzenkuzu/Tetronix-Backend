@@ -9,64 +9,116 @@ pub use server::ServerResponse;
 pub use client::ClientAction;
 pub use client::ClientActionType;
 
-use serde::{Deserialize, Serialize, Deserializer, Serializer};
-use sqlx::FromRow;
 use actix_ws::{CloseCode, CloseReason};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use sqlx::FromRow;
 
 #[derive(Deserialize, Serialize, Debug, FromRow, PartialEq)]
 pub struct Game {
-    pub game_owner : String,
-    pub game_score : i32,
-    pub game_level : i32,
-    pub game_lines : i32,
-    pub game_actions : Vec<Action>,
+    pub game_owner: String,
+    pub game_score: i32,
+    pub game_level: i32,
+    pub game_lines: i32,
+    pub game_actions: Vec<Action>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, FromRow)]
 pub struct GameJson {
-    pub game_owner : String,
-    pub game_score : i32,
-    pub game_level : i32,
-    pub game_lines : i32,
-    pub game_actions : serde_json::Value,
+    pub game_owner: String,
+    pub game_score: i32,
+    pub game_level: i32,
+    pub game_lines: i32,
+    pub game_actions: serde_json::Value,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, FromRow, PartialEq)]
 pub struct GameStats {
-    pub game_score : i32,
-    pub game_level : i32,
-    pub game_lines : i32,
+    pub game_score: i32,
+    pub game_level: i32,
+    pub game_lines: i32,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, FromRow, PartialEq)]
 pub struct Piece {
-    pub shape : Vec<Vec<bool>>,
-    pub piece_type : PieceType
+    pub shape: Vec<Vec<bool>>,
+    pub piece_type: PieceType,
 }
 
 impl Default for Piece {
     fn default() -> Self {
-        Self { shape: vec![], piece_type: PieceType::Empty }
+        Self {
+            shape: vec![],
+            piece_type: PieceType::Empty,
+        }
     }
 }
 
 impl From<PieceType> for Piece {
-    fn from(piece_type : PieceType) -> Self {
+    fn from(piece_type: PieceType) -> Self {
         match piece_type {
-            PieceType::Cyan => Piece { shape: vec![vec![false, true, false, false], vec![false, true, false, false], vec![false, true, false, false], vec![false, true, false, false]], piece_type: PieceType::Cyan },
-            PieceType::Blue => Piece { shape: vec![vec![false, true, false], vec![false, true, false], vec![false, true, true]], piece_type: PieceType::Blue },
-            PieceType::Yellow => Piece { shape: vec![vec![true, true], vec![true, true]], piece_type: PieceType::Yellow },
-            PieceType::Orange => Piece { shape: vec![vec![false, true, false], vec![false, true, false], vec![true, true, false]], piece_type: PieceType::Orange },
-            PieceType::Purple => Piece { shape: vec![vec![false, true, false], vec![true, true, true], vec![false, false, false]], piece_type: PieceType::Purple },
-            PieceType::Green => Piece { shape: vec![vec![true, true, false], vec![false, true, true], vec![false, false, false]], piece_type: PieceType::Green },
-            PieceType::Red => Piece { shape: vec![vec![false, true, true], vec![true, true, false], vec![false, false, false]], piece_type: PieceType::Red },
-            PieceType::Empty => Piece { shape: vec![], piece_type: PieceType::Empty },
+            PieceType::Cyan => Piece {
+                shape: vec![
+                    vec![false, true, false, false],
+                    vec![false, true, false, false],
+                    vec![false, true, false, false],
+                    vec![false, true, false, false],
+                ],
+                piece_type: PieceType::Cyan,
+            },
+            PieceType::Blue => Piece {
+                shape: vec![
+                    vec![false, true, false],
+                    vec![false, true, false],
+                    vec![false, true, true],
+                ],
+                piece_type: PieceType::Blue,
+            },
+            PieceType::Yellow => Piece {
+                shape: vec![vec![true, true], vec![true, true]],
+                piece_type: PieceType::Yellow,
+            },
+            PieceType::Orange => Piece {
+                shape: vec![
+                    vec![false, true, false],
+                    vec![false, true, false],
+                    vec![true, true, false],
+                ],
+                piece_type: PieceType::Orange,
+            },
+            PieceType::Purple => Piece {
+                shape: vec![
+                    vec![false, true, false],
+                    vec![true, true, true],
+                    vec![false, false, false],
+                ],
+                piece_type: PieceType::Purple,
+            },
+            PieceType::Green => Piece {
+                shape: vec![
+                    vec![true, true, false],
+                    vec![false, true, true],
+                    vec![false, false, false],
+                ],
+                piece_type: PieceType::Green,
+            },
+            PieceType::Red => Piece {
+                shape: vec![
+                    vec![false, true, true],
+                    vec![true, true, false],
+                    vec![false, false, false],
+                ],
+                piece_type: PieceType::Red,
+            },
+            PieceType::Empty => Piece {
+                shape: vec![],
+                piece_type: PieceType::Empty,
+            },
         }
     }
 }
 
 impl From<u8> for PieceType {
-    fn from(value : u8) -> Self {
+    fn from(value: u8) -> Self {
         match value {
             0x00 => PieceType::Cyan,
             0x01 => PieceType::Blue,
@@ -113,18 +165,11 @@ impl<'de> Deserialize<'de> for PieceType {
     }
 }
 
-pub enum GameResult {
-    Score(i32,i32,i32),
-    IllegalMove,
-}
-
-pub enum GameCloseReason {  
+pub enum GameCloseReason {
     GameEnded,
-    IllegalMove,
     InternalError,
     InvalidMessageLength,
     NoUserFound,
-    Timeout,
 }
 
 impl GameCloseReason {
@@ -133,10 +178,6 @@ impl GameCloseReason {
             GameCloseReason::GameEnded => CloseReason {
                 code: CloseCode::Normal,
                 description: Some("Game ended".to_string()),
-            },
-            GameCloseReason::IllegalMove => CloseReason {
-                code: CloseCode::Error,
-                description: Some("Illegal move".to_string()),
             },
             GameCloseReason::InternalError => CloseReason {
                 code: CloseCode::Error,
@@ -149,10 +190,6 @@ impl GameCloseReason {
             GameCloseReason::NoUserFound => CloseReason {
                 code: CloseCode::Policy,
                 description: Some("No user found".to_string()),
-            },
-            GameCloseReason::Timeout => CloseReason {
-                code: CloseCode::Error,
-                description: Some("Timeout".to_string()),
             },
         }
     }

@@ -1,6 +1,6 @@
-use actix_web::{FromRequest, HttpMessage, HttpRequest, dev::Payload};
-use crate::models::AuthenticatedUser;
 use crate::errors::AppError;
+use crate::models::AuthenticatedUser;
+use actix_web::{dev::Payload, FromRequest, HttpMessage, HttpRequest};
 use futures_util::future::{ready, Ready};
 
 impl FromRequest for AuthenticatedUser {

@@ -1,10 +1,10 @@
+use crate::config::AuthConfig;
+use crate::repository::{GameRepository, UserRepository};
 use crate::services::{AuthService, GameService, UserService};
-use crate::repository::{UserRepository, GameRepository};
-use crate::config::{AuthConfig};
 use sqlx::{Pool, Postgres};
 
 #[derive(Clone)]
-pub struct AppState<A, G, U> 
+pub struct AppState<A, G, U>
 where
     A: crate::services::AuthServiceTrait,
     G: crate::services::GameServiceTrait,
@@ -15,7 +15,8 @@ where
     pub user_service: U,
 }
 
-pub type ConcreteAppState = AppState<AuthService<UserRepository>, GameService<GameRepository>, UserService<UserRepository>>;
+pub type ConcreteAppState =
+    AppState<AuthService<UserRepository>, GameService<GameRepository>, UserService<UserRepository>>;
 
 impl ConcreteAppState {
     pub fn new(pool: Pool<Postgres>, auth_config: AuthConfig) -> ConcreteAppState {

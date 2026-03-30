@@ -1,12 +1,12 @@
-use crate::{ConcreteAppState, config::AuthConfig};
-use sqlx::{PgPool, postgres::PgPoolOptions};
-use dotenv::dotenv;
 use crate::builder::game_builder::GameBuilder;
-use std::sync::OnceLock;
-use std::env;
-use uuid::Uuid;
 use crate::models::Game;
-use crate::services::{UserServiceTrait, GameServiceTrait};
+use crate::services::{GameServiceTrait, UserServiceTrait};
+use crate::{config::AuthConfig, ConcreteAppState};
+use dotenv::dotenv;
+use sqlx::{postgres::PgPoolOptions, PgPool};
+use std::env;
+use std::sync::OnceLock;
+use uuid::Uuid;
 
 static POOL: OnceLock<PgPool> = OnceLock::new();
 
@@ -15,8 +15,8 @@ async fn get_pool() -> &'static PgPool {
         pool
     } else {
         dotenv().ok();
-        let database_url = env::var("TEST_DATABASE_URL")
-            .expect("TEST_DATABASE_URL must be set for tests");
+        let database_url =
+            env::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set for tests");
         let pool = PgPoolOptions::new()
             .max_connections(20)
             .connect(&database_url)
@@ -40,38 +40,59 @@ impl HandlersFixture {
         format!("test_user_{}", Uuid::new_v4())
     }
 
-    pub async fn with_test_user<F, Fut, R> (&self, test_fn : F) -> R
-    where 
+    pub async fn with_test_user<F, Fut, R>(&self, test_fn: F) -> R
+    where
         F: FnOnce(String, String, ConcreteAppState) -> Fut,
         Fut: std::future::Future<Output = R>,
     {
         let username = self.random_user_name();
-        let _ =self.app_state.user_service.create(&username).await.expect("Failed to create test user");
-        let jwt = self.app_state.auth_service.create_jwt(username.clone()).expect("Failed to create JWT");
+        let _ = self
+            .app_state
+            .user_service
+            .create(&username)
+            .await
+            .expect("Failed to create test user");
+        let jwt = self
+            .app_state
+            .auth_service
+            .create_jwt(username.clone())
+            .expect("Failed to create JWT");
 
         let result = test_fn(username.clone(), jwt, self.app_state.clone()).await;
-        
+
         let _ = self.app_state.user_service.delete(&username).await;
         result
     }
 
-    pub async fn with_test_user_and_game<F, Fut, R> (&self, test_fn : F) -> R
-    where 
+    pub async fn with_test_user_and_game<F, Fut, R>(&self, test_fn: F) -> R
+    where
         F: FnOnce(String, String, Game, ConcreteAppState) -> Fut,
         Fut: std::future::Future<Output = R>,
     {
         let username = self.random_user_name();
-        let _ =self.app_state.user_service.create(&username).await.expect("Failed to create test user");
-        let jwt = self.app_state.auth_service.create_jwt(username.clone()).expect("Failed to create JWT");
+        let _ = self
+            .app_state
+            .user_service
+            .create(&username)
+            .await
+            .expect("Failed to create test user");
+        let jwt = self
+            .app_state
+            .auth_service
+            .create_jwt(username.clone())
+            .expect("Failed to create JWT");
 
         let game = GameBuilder::new(&username).build();
-        let _ = self.app_state.game_service.upsert(&game).await.expect("Failed to create test game");
+        let _ = self
+            .app_state
+            .game_service
+            .upsert(&game)
+            .await
+            .expect("Failed to create test game");
 
         let result = test_fn(username.clone(), jwt, game, self.app_state.clone()).await;
-        
+
         let _ = self.app_state.user_service.delete(&username).await;
         result
     }
-
-
 }

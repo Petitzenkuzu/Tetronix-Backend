@@ -1,10 +1,10 @@
-use sqlx::{Pool, Postgres};
 use crate::errors::RepositoryError;
-use crate::models::Game;
-use crate::models::GameStats;
-use crate::models::GameJson;
 use crate::models::Action;
+use crate::models::Game;
+use crate::models::GameJson;
+use crate::models::GameStats;
 use crate::repository::GameRepositoryTrait;
+use sqlx::{Pool, Postgres};
 #[derive(Clone)]
 pub struct GameRepository {
     pub db: Pool<Postgres>,
@@ -18,18 +18,18 @@ impl GameRepository {
 
 impl GameRepositoryTrait for GameRepository {
     /// Upsert a game
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `game` - The game to upsert
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Ok(())` - If the game has been upserted successfully
     /// * `Err(RepositoryError::InternalServerError)` - If there is a database error
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// let repo = GameRepository::new(db_pool);
     /// match repo.upsert_game(&game).await {
@@ -38,7 +38,9 @@ impl GameRepositoryTrait for GameRepository {
     /// }
     /// ```
     async fn upsert_game(&self, game: &Game) -> Result<(), RepositoryError> {
-        let actions = serde_json::to_value(&game.game_actions).map_err(|_| RepositoryError::SerializationError("Failed to serialize game actions".into()))?;
+        let actions = serde_json::to_value(&game.game_actions).map_err(|_| {
+            RepositoryError::SerializationError("Failed to serialize game actions".into())
+        })?;
         let result = sqlx::query("INSERT INTO games (game_owner, game_score, game_level, game_lines, game_actions) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (game_owner) DO UPDATE SET game_score = EXCLUDED.game_score, game_level = EXCLUDED.game_level, game_lines = EXCLUDED.game_lines, game_actions = EXCLUDED.game_actions")
             .bind(&game.game_owner)
             .bind(game.game_score)
@@ -47,34 +49,36 @@ impl GameRepositoryTrait for GameRepository {
             .bind(actions)
             .execute(&self.db)
             .await;
-    
+
         match result {
             Ok(result) => {
                 if result.rows_affected() == 0 {
-                    Err(RepositoryError::InternalServerError("Failed to upsert game".into()))
+                    Err(RepositoryError::InternalServerError(
+                        "Failed to upsert game".into(),
+                    ))
                 } else {
                     Ok(())
-                }   
-            },
+                }
+            }
             Err(e) => Err(RepositoryError::InternalServerError(e.to_string())),
         }
     }
 
     /// Get a game by its owner
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `owner` - The name of the user to get the game for
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Ok(game)` - If the game has been found
     /// * `Err(RepositoryError::NotFound)` - If the game does not exist
     /// * `Err(RepositoryError::DeserializationError)` - If the game actions cannot be deserialized
     /// * `Err(RepositoryError::InternalServerError)` - If there is a database error
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// let repo = GameRepository::new(db_pool);
     /// match repo.get_game_by_owner("john_doe").await {
@@ -83,16 +87,20 @@ impl GameRepositoryTrait for GameRepository {
     /// }
     /// ```
     async fn get_game_by_owner(&self, owner: &str) -> Result<Game, RepositoryError> {
-
-        let game = sqlx::query_as::<_, GameJson>("SELECT * FROM games WHERE game_owner = $1 LIMIT 1 ;")
-            .bind(owner)
-            .fetch_optional(&self.db)
-            .await;
+        let game =
+            sqlx::query_as::<_, GameJson>("SELECT * FROM games WHERE game_owner = $1 LIMIT 1 ;")
+                .bind(owner)
+                .fetch_optional(&self.db)
+                .await;
 
         match game {
             Ok(Some(game)) => {
-                let game_actions: Vec<Action> = serde_json::from_value(game.game_actions)
-                    .map_err(|_| RepositoryError::DeserializationError("Failed to deserialize game actions".into()))?;
+                let game_actions: Vec<Action> =
+                    serde_json::from_value(game.game_actions).map_err(|_| {
+                        RepositoryError::DeserializationError(
+                            "Failed to deserialize game actions".into(),
+                        )
+                    })?;
 
                 let game = Game {
                     game_owner: game.game_owner,
@@ -104,25 +112,27 @@ impl GameRepositoryTrait for GameRepository {
 
                 Ok(game)
             }
-            Ok(None) => Err(RepositoryError::NotFound{what: "Game".into()}),
+            Ok(None) => Err(RepositoryError::NotFound {
+                what: "Game".into(),
+            }),
             Err(e) => Err(RepositoryError::InternalServerError(e.to_string())),
         }
     }
 
     /// Get the stats of a game by its owner
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `owner` - The name of the user to get the stats for
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Ok(stats)` - If the stats have been found
     /// * `Err(RepositoryError::NotFound)` - If the game does not exist
     /// * `Err(RepositoryError::InternalServerError)` - If there is a database error
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// let repo = GameRepository::new(db_pool);
     /// match repo.get_game_stats_by_owner("john_doe").await {
@@ -131,17 +141,19 @@ impl GameRepositoryTrait for GameRepository {
     /// }
     /// ```
     async fn get_game_stats_by_owner(&self, owner: &str) -> Result<GameStats, RepositoryError> {
+        let game = sqlx::query_as::<_, GameStats>(
+            "SELECT game_score, game_level, game_lines FROM games WHERE game_owner = $1 LIMIT 1 ;",
+        )
+        .bind(owner)
+        .fetch_optional(&self.db)
+        .await;
 
-        let game = sqlx::query_as::<_, GameStats>("SELECT game_score, game_level, game_lines FROM games WHERE game_owner = $1 LIMIT 1 ;")
-            .bind(owner)
-            .fetch_optional(&self.db)
-            .await;
-    
         match game {
             Ok(Some(game)) => Ok(game),
-            Ok(None) => Err(RepositoryError::NotFound{what: "Game".into()}),
+            Ok(None) => Err(RepositoryError::NotFound {
+                what: "Game".into(),
+            }),
             Err(e) => Err(RepositoryError::InternalServerError(e.to_string())),
         }
     }
-
 }

@@ -9,7 +9,7 @@ pub struct GithubCredentials {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct GithubTokenResponse {
     pub access_token: String,
-    pub token_type: String
+    pub token_type: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

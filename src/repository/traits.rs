@@ -1,6 +1,7 @@
 use crate::errors::RepositoryError;
-use crate::models::{User, Game, GameStats};
+use crate::models::{Game, GameStats, User};
 
+#[allow(dead_code)]
 pub trait UserRepositoryTrait: Clone {
     async fn create_user(&self, name: &str) -> Result<(), RepositoryError>;
     async fn update_user(&self, user: &User) -> Result<(), RepositoryError>;

@@ -1,15 +1,15 @@
 use std::future::{ready, Ready};
 
+use crate::errors::AppError;
+use crate::models::AuthenticatedUser;
+use crate::models::ConcreteAppState;
+use crate::services::AuthServiceTrait;
+use actix_web::web::Data;
 use actix_web::{
-    Error, HttpMessage, dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready}
+    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
+    Error, HttpMessage,
 };
 use futures_util::future::LocalBoxFuture;
-use actix_web::web::Data;
-use crate::models::ConcreteAppState;
-use crate::errors::AppError;
-use crate::services::AuthServiceTrait;
-use crate::models::AuthenticatedUser;
-use tracing::info;
 
 pub struct Auth;
 
@@ -49,27 +49,25 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let app_state = match req.app_data::<Data<ConcreteAppState>>() {
             Some(app_state) => app_state,
-            None => return Box::pin(async move {
-                Err(AppError::InternalServerError("Something went wrong".to_string()).into())
-            }),
+            None => {
+                return Box::pin(async move {
+                    Err(AppError::InternalServerError("Something went wrong".to_string()).into())
+                })
+            }
         };
 
         let auth_token = match req.cookie("auth_token") {
             Some(auth_token) => auth_token,
-            None => return Box::pin(async move {
-                Err(AppError::Unauthorized.into())
-            }),
+            None => return Box::pin(async move { Err(AppError::Unauthorized.into()) }),
         };
 
         let username = match app_state.auth_service.verify_jwt(&auth_token.value()) {
             Ok(username) => username,
-            Err(_) => return Box::pin(async move {
-                Err(AppError::Unauthorized.into())
-            })
+            Err(_) => return Box::pin(async move { Err(AppError::Unauthorized.into()) }),
         };
 
         req.extensions_mut().insert(AuthenticatedUser { username });
-        
+
         let fut = self.service.call(req);
 
         Box::pin(async move {

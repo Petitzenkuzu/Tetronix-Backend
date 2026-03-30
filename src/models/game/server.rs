@@ -1,11 +1,11 @@
-use crate::models::{PieceType};
-use serde::{Deserialize, Serialize, Serializer, Deserializer};
 use crate::builder::game_builder::GameBuilder;
+use crate::models::PieceType;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 pub struct Action {
-    action_type : ActionType,
-    timestamp : u128,
-    piece : Option<PieceType>	
+    action_type: ActionType,
+    timestamp: u128,
+    piece: Option<PieceType>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -53,7 +53,7 @@ impl ActionType {
             ActionType::End => 0x07,
         }
     }
-    pub fn from_u8(binary : u8) -> Self {
+    pub fn from_u8(binary: u8) -> Self {
         match binary {
             0x00 => Self::Fall,
             0x01 => Self::Piece,
@@ -70,13 +70,17 @@ impl ActionType {
 
 impl Action {
     pub fn new(action_type: ActionType, timestamp: u128, piece: Option<PieceType>) -> Self {
-        Self { action_type, timestamp, piece }
+        Self {
+            action_type,
+            timestamp,
+            piece,
+        }
     }
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct Ack {
-    id : u32,
+    id: u32,
 }
 
 impl Ack {

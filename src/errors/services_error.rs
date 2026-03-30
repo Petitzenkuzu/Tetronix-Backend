@@ -1,46 +1,46 @@
-use thiserror::Error;
 use crate::errors::RepositoryError;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ServicesError {
     #[error("internal server error: {0}")]
     InternalServerError(String),
     #[error("Invalid Input on field : {field} , {message}")]
-    InvalidInput{field: String, message: String},
+    InvalidInput { field: String, message: String },
     #[error("{what} not found")]
-    NotFound{what: String},
+    NotFound { what: String },
     #[error("{what} already exists")]
-    AlreadyExists{what: String},
-    #[error("unable to delete {what}")]
-    UnableToDelete{what: String},
+    AlreadyExists { what: String },
     #[error("unable to serialize {what}")]
-    UnableToSerialize{what: String},
+    UnableToSerialize { what: String },
     #[error("unable to deserialize {what}")]
-    UnableToDeserialize{what: String},
+    UnableToDeserialize { what: String },
     #[error("Authentication Failed : {reason}")]
-    AuthenticationFailed{reason: String},
+    AuthenticationFailed { reason: String },
     #[error("Invalid JWT: {reason}")]
-    InvalidJWT{reason: String},
+    InvalidJWT { reason: String },
+    #[error("Unable to delete {what}")]
+    #[allow(dead_code)]
+    UnableToDelete { what: String },
 }
 
 impl From<RepositoryError> for ServicesError {
     fn from(err: RepositoryError) -> Self {
         match err {
-            RepositoryError::NotFound { what } => {
-                ServicesError::NotFound { what }
-            }
-            RepositoryError::AlreadyExists { what } => {
-                ServicesError::AlreadyExists { what }
-            }
-            RepositoryError::InternalServerError(msg) => {
-                ServicesError::InternalServerError(msg)
-            }
-            RepositoryError::InvalidInput { what } => {
-                ServicesError::InvalidInput { field: what, message: "is invalid".to_string() }
-            }
-            RepositoryError::InvalidLimit { low, high } => {
-                ServicesError::InvalidInput { field: "limit".to_string(), message: format!("must be greater or equal to {} and less or equal to {}", low, high) }
-            }
+            RepositoryError::NotFound { what } => ServicesError::NotFound { what },
+            RepositoryError::AlreadyExists { what } => ServicesError::AlreadyExists { what },
+            RepositoryError::InternalServerError(msg) => ServicesError::InternalServerError(msg),
+            RepositoryError::InvalidInput { what } => ServicesError::InvalidInput {
+                field: what,
+                message: "is invalid".to_string(),
+            },
+            RepositoryError::InvalidLimit { low, high } => ServicesError::InvalidInput {
+                field: "limit".to_string(),
+                message: format!(
+                    "must be greater or equal to {} and less or equal to {}",
+                    low, high
+                ),
+            },
             RepositoryError::SerializationError(msg) => {
                 ServicesError::UnableToSerialize { what: msg }
             }

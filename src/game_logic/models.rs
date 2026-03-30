@@ -1,7 +1,7 @@
 use crate::models::PieceType;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Grid {
-    pub grid : Vec<Vec<PieceType>>
+    pub grid: Vec<Vec<PieceType>>,
 }

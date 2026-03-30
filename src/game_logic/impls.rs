@@ -1,11 +1,11 @@
-use crate::models::{Piece, PieceType};
 use crate::game_logic::Grid;
+use crate::models::{Piece, PieceType};
 
 impl Piece {
     pub fn rotate(&self) -> Vec<Vec<bool>> {
         let mut new_shape = vec![vec![false; self.shape.len()]; self.shape[0].len()];
-        for i in 0..self.shape.len(){
-            for j in 0..self.shape[i].len(){
+        for i in 0..self.shape.len() {
+            for j in 0..self.shape[i].len() {
                 new_shape[j][self.shape.len() - i - 1] = self.shape[i][j];
             }
         }
@@ -27,7 +27,7 @@ impl PieceType {
         }
     }
 
-    pub fn from_u8(binary : u8) -> Self {
+    pub fn from_u8(binary: u8) -> Self {
         match binary {
             0x00 => Self::Cyan,
             0x01 => Self::Blue,
@@ -49,17 +49,21 @@ impl Grid {
         }
     }
 
-    pub fn is_placeable(&self, piece : &Piece, (x, y) : (i32, i32)) -> bool {
-        for i in 0..piece.shape.len(){
-            for j in 0..piece.shape[i].len(){
+    pub fn is_placeable(&self, piece: &Piece, (x, y): (i32, i32)) -> bool {
+        for i in 0..piece.shape.len() {
+            for j in 0..piece.shape[i].len() {
                 if piece.shape[i][j] {
                     if (x + i as i32) < 0 || (y + j as i32) < 0 {
                         return false;
                     }
-                    if (x + i as i32) >= self.grid.len() as i32 || (y + j as i32) >= self.grid[0].len() as i32 {
+                    if (x + i as i32) >= self.grid.len() as i32
+                        || (y + j as i32) >= self.grid[0].len() as i32
+                    {
                         return false;
                     }
-                    if self.grid[(x + i as i32) as usize][(y + j as i32) as usize] != PieceType::Empty {
+                    if self.grid[(x + i as i32) as usize][(y + j as i32) as usize]
+                        != PieceType::Empty
+                    {
                         return false;
                     }
                 }
@@ -68,9 +72,9 @@ impl Grid {
         true
     }
 
-    pub fn place_piece(&mut self, piece : &Piece, (x, y) : (i32, i32)) {
-        for i in 0..piece.shape.len(){
-            for j in 0..piece.shape[i].len(){
+    pub fn place_piece(&mut self, piece: &Piece, (x, y): (i32, i32)) {
+        for i in 0..piece.shape.len() {
+            for j in 0..piece.shape[i].len() {
                 if piece.shape[i][j] {
                     self.grid[x as usize + i][(y + j as i32) as usize] = piece.piece_type;
                 }
@@ -78,23 +82,22 @@ impl Grid {
         }
     }
 
-    pub fn get_ghost_x(&self, piece : &Piece, (x, y) : (i32, i32)) -> i32 {   
-        let mut ghost_x = x+1;
+    pub fn get_ghost_x(&self, piece: &Piece, (x, y): (i32, i32)) -> i32 {
+        let mut ghost_x = x + 1;
         while self.is_placeable(piece, (ghost_x, y)) {
             ghost_x += 1;
         }
         ghost_x - 1
     }
-    pub fn delete_full_rows(&mut self, level : i32) -> (i32, i32) {
+    pub fn delete_full_rows(&mut self, level: i32) -> (i32, i32) {
         let mut lines_cleared = 0_i32;
         let mut score = 0_i32;
-        let mut row = (self.grid.len()-1) as i32;
+        let mut row = (self.grid.len() - 1) as i32;
         let mut temp_grid = vec![vec![PieceType::Empty; self.grid[0].len()]; self.grid.len()];
         for i in (0..self.grid.len()).rev() {
             if self.grid[i].iter().all(|&cell| cell != PieceType::Empty) {
                 lines_cleared += 1;
-            }
-            else {
+            } else {
                 temp_grid[row as usize] = std::mem::take(&mut self.grid[i]);
                 row -= 1;
             }
