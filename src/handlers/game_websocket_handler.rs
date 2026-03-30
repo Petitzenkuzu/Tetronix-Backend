@@ -1,3 +1,4 @@
+use crate::builder::user_builder::UserBuilder;
 use crate::errors::AppError;
 use crate::game_logic::GameEngine;
 use crate::models::ClientAction;
@@ -90,6 +91,12 @@ async fn start_game(
                             break;
                         }
                         else {
+                            let user = UserBuilder::new(&user.name)
+                                        .with_score(std::cmp::max(user.best_score, game.game_score))
+                                        .with_level(std::cmp::max(user.highest_level, game.game_level))
+                                        .with_games(user.number_of_games.saturating_add(1))
+                                        .build();
+                            let _ = state.user_service.update(&user).await;
                             ws_session.close(Some(GameCloseReason::GameEnded.to_close_reason())).await.unwrap();
                             break;
                         }
