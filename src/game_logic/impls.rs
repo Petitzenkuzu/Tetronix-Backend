@@ -5,7 +5,7 @@ impl Piece {
     pub fn rotate(&self) -> Vec<Vec<bool>> {
         let mut new_shape = vec![vec![false; self.shape.len()]; self.shape[0].len()];
         for i in 0..self.shape.len() {
-            for j in 0..self.shape[i].len() {
+            for (j, _) in self.shape[i].iter().enumerate() {
                 new_shape[j][self.shape.len() - i - 1] = self.shape[i][j];
             }
         }
@@ -14,7 +14,7 @@ impl Piece {
 }
 
 impl PieceType {
-    pub fn to_u8(&self) -> u8 {
+    pub fn to_u8(self) -> u8 {
         match self {
             PieceType::Cyan => 0x00,
             PieceType::Blue => 0x01,

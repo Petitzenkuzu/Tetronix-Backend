@@ -67,7 +67,7 @@ impl<T: UserRepositoryTrait> AuthService<T> {
                 ("client_id", client_id.as_str()),
                 ("client_secret", client_secret.as_str()),
                 ("code", code),
-                ("redirect_uri", format!("{}", redirect_uri).as_str()),
+                ("redirect_uri", redirect_uri),
             ])
             .header("Accept", "application/json")
             .send()
@@ -183,7 +183,7 @@ impl<T: UserRepositoryTrait> AuthService<T> {
             .timestamp() as usize;
 
         let claims = Claims {
-            username: username,
+            username,
             exp: expiration,
         };
 
@@ -192,7 +192,7 @@ impl<T: UserRepositoryTrait> AuthService<T> {
             &claims,
             &EncodingKey::from_secret(self.config.session_secret_key.as_ref()),
         )
-        .map_err(|_| ServicesError::InternalServerError(format!("Something went wrong")))?;
+        .map_err(|_| ServicesError::InternalServerError("Something went wrong".to_string()))?;
         Ok(jwt)
     }
 }

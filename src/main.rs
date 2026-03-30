@@ -13,6 +13,7 @@ mod middleware;
 mod models;
 mod repository;
 mod services;
+#[cfg(test)]
 mod tests;
 use actix_web_prom::PrometheusMetricsBuilder;
 use config::{AuthConfig, ServerConfig};

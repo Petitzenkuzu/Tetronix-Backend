@@ -105,10 +105,7 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         // get the client ip
-        let client_ip = match req.connection_info().peer_addr() {
-            Some(ip) => Some(ip.to_string()),
-            None => None,
-        };
+        let client_ip = req.connection_info().peer_addr().map(|ip| ip.to_string());
 
         // check the limit
         if let Some(ip) = client_ip {

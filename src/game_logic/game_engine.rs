@@ -144,8 +144,8 @@ impl GameEngine {
             action_queue: vec![],
             last_fall: 0,
             start: Instant::now(),
-            receiver: receiver,
-            sender: sender,
+            receiver,
+            sender,
             need_to_send_state: false,
             send_ack: false,
             missing_actions_message_pending: None,
@@ -156,7 +156,7 @@ impl GameEngine {
     fn process_fall(&mut self) -> bool {
         // fall time formula 1000*(0.8**level.value)
         if self.state.timestamp
-            > self.last_fall + (1000_f32 * (0.8_f32.powi(self.state.level as i32))) as u128
+            > self.last_fall + (1000_f32 * (0.8_f32.powi(self.state.level))) as u128
         {
             if self
                 .state

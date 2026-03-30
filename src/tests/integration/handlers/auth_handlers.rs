@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use crate::errors::AppError;
     use crate::handlers::{get_user, github_auth, logout};
     use crate::middleware::auth_middleware::Auth;
     use crate::models::User;
@@ -85,7 +84,7 @@ mod tests {
         let error = resp.err().unwrap().error_response();
         assert_eq!(error.status(), StatusCode::UNAUTHORIZED);
 
-        let _ = fixture
+        () = fixture
             .app_state
             .user_service
             .delete("test_user")

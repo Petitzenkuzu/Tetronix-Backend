@@ -57,18 +57,18 @@ mod tests {
 
         fixture
             .with_test_user(|username1, jwt, app_state| async move {
-                let _ = app_state
+                () = app_state
                     .user_service
                     .create(&username2)
                     .await
                     .expect("Failed to create test user");
-                let _ = app_state
+                () = app_state
                     .user_service
                     .create(&username3)
                     .await
                     .expect("Failed to create test user");
 
-                let _ = app_state
+                () = app_state
                     .user_service
                     .update(
                         &UserBuilder::new(&username1)
@@ -80,7 +80,7 @@ mod tests {
                     .await
                     .expect("Failed to update test user score");
 
-                let _ = app_state
+                () = app_state
                     .user_service
                     .update(
                         &UserBuilder::new(&username2)
@@ -92,7 +92,7 @@ mod tests {
                     .await
                     .expect("Failed to update test user score");
 
-                let _ = app_state
+                () = app_state
                     .user_service
                     .update(
                         &UserBuilder::new(&username3)
@@ -122,12 +122,12 @@ mod tests {
                 assert_eq!(resp[1].name, username2);
                 assert_eq!(resp[2].name, username1);
 
-                let _ = app_state
+                () = app_state
                     .user_service
                     .delete(&username2)
                     .await
                     .expect("Failed to delete test user");
-                let _ = app_state
+                () = app_state
                     .user_service
                     .delete(&username3)
                     .await

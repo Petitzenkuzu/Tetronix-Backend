@@ -50,7 +50,7 @@ impl<'de> Deserialize<'de> for ClientActionType {
 }
 
 impl ClientActionType {
-    pub fn to_u8(&self) -> u8 {
+    pub fn to_u8(self) -> u8 {
         match self {
             ClientActionType::Right => 0x00,
             ClientActionType::Left => 0x01,

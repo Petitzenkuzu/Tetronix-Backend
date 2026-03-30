@@ -17,7 +17,7 @@ mod tests {
                     .with_level(10)
                     .with_lines(100)
                     .build();
-                let _ = game_service.upsert(&new_game).await.unwrap();
+                () = game_service.upsert(&new_game).await.unwrap();
 
                 let received_game = game_service.get_by_owner(&username).await.unwrap();
                 assert_eq!(received_game, new_game);

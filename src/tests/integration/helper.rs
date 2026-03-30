@@ -46,7 +46,7 @@ impl HandlersFixture {
         Fut: std::future::Future<Output = R>,
     {
         let username = self.random_user_name();
-        let _ = self
+        () = self
             .app_state
             .user_service
             .create(&username)
@@ -70,7 +70,7 @@ impl HandlersFixture {
         Fut: std::future::Future<Output = R>,
     {
         let username = self.random_user_name();
-        let _ = self
+        () = self
             .app_state
             .user_service
             .create(&username)
@@ -83,7 +83,7 @@ impl HandlersFixture {
             .expect("Failed to create JWT");
 
         let game = GameBuilder::new(&username).build();
-        let _ = self
+        () = self
             .app_state
             .game_service
             .upsert(&game)

@@ -27,7 +27,6 @@ async fn get_pool() -> &'static PgPool {
 }
 
 pub struct RepositoryTestFixture {
-    pub pool: &'static PgPool,
     pub user_repo: UserRepository,
     pub game_repo: GameRepository,
 }
@@ -36,7 +35,6 @@ impl RepositoryTestFixture {
     pub async fn new() -> Self {
         let pool = get_pool().await;
         Self {
-            pool,
             user_repo: UserRepository::new(pool.clone()),
             game_repo: GameRepository::new(pool.clone()),
         }
@@ -101,7 +99,7 @@ impl RepositoryTestFixture {
 macro_rules! assert_repository_not_found {
     ($result:expr) => {
         match $result {
-            Err(crate::errors::RepositoryError::NotFound { .. }) => {}
+            Err($crate::errors::RepositoryError::NotFound { .. }) => {}
             Ok(_) => panic!(
                 "Expected NotFound error, got success at {}",
                 std::panic::Location::caller()
@@ -119,7 +117,7 @@ macro_rules! assert_repository_not_found {
 macro_rules! assert_repository_already_exists {
     ($result:expr) => {
         match $result {
-            Err(crate::errors::RepositoryError::AlreadyExists { .. }) => {}
+            Err($crate::errors::RepositoryError::AlreadyExists { .. }) => {}
             Ok(_) => panic!(
                 "Expected AlreadyExists error, got success at {}",
                 std::panic::Location::caller()
@@ -137,7 +135,7 @@ macro_rules! assert_repository_already_exists {
 macro_rules! assert_repository_invalid_input {
     ($result:expr) => {
         match $result {
-            Err(crate::errors::RepositoryError::InvalidInput { .. }) => {}
+            Err($crate::errors::RepositoryError::InvalidInput { .. }) => {}
             Ok(_) => panic!(
                 "Expected InvalidInput error, got success at {}",
                 std::panic::Location::caller()

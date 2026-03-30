@@ -23,9 +23,9 @@ impl PieceRng {
 
     fn refill(&mut self) {
         let mut array = [0; 20];
-        for i in 0..20 {
-            array[i] = self.rng.random_range(0..7) as u8;
-        }
+        array
+            .iter_mut()
+            .for_each(|x| *x = self.rng.random_range(0..7) as u8);
         self.pieces = array
             .iter()
             .map(|&id| PieceRng::generate_piece(id))

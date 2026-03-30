@@ -29,7 +29,6 @@ async fn get_pool() -> &'static PgPool {
 }
 
 pub struct ServiceTestFixture {
-    pub pool: &'static PgPool,
     pub user_service: UserService<UserRepository>,
     pub game_service: GameService<GameRepository>,
     pub auth_service: AuthService<UserRepository>,
@@ -41,7 +40,6 @@ impl ServiceTestFixture {
         let user_repo = UserRepository::new(pool.clone());
         let game_repo = GameRepository::new(pool.clone());
         Self {
-            pool,
             user_service: UserService::new(user_repo.clone()),
             game_service: GameService::new(game_repo),
             auth_service: AuthService::new(user_repo, AuthConfig::from_env()),
@@ -58,7 +56,7 @@ impl ServiceTestFixture {
         Fut: std::future::Future<Output = R>,
     {
         let username = self.random_user_name();
-        let _ = self
+        () = self
             .user_service
             .create(&username)
             .await
@@ -76,14 +74,14 @@ impl ServiceTestFixture {
         Fut: std::future::Future<Output = R>,
     {
         let username = self.random_user_name();
-        let _ = self
+        () = self
             .user_service
             .create(&username)
             .await
             .expect("Failed to create test user");
 
         let game = GameBuilder::new(&username).build();
-        let _ = self
+        () = self
             .game_service
             .upsert(&game)
             .await
@@ -106,7 +104,7 @@ impl ServiceTestFixture {
 macro_rules! assert_service_not_found {
     ($result:expr) => {
         match $result {
-            Err(crate::errors::ServicesError::NotFound { .. }) => {}
+            Err($crate::errors::ServicesError::NotFound { .. }) => {}
             Ok(_) => panic!(
                 "Expected ServicesError::NotFound, got success at {}",
                 std::panic::Location::caller()
@@ -124,7 +122,7 @@ macro_rules! assert_service_not_found {
 macro_rules! assert_service_already_exists {
     ($result:expr) => {
         match $result {
-            Err(crate::errors::ServicesError::AlreadyExists { .. }) => {}
+            Err($crate::errors::ServicesError::AlreadyExists { .. }) => {}
             Ok(_) => panic!(
                 "Expected ServicesError::AlreadyExists, got success at {}",
                 std::panic::Location::caller()
@@ -142,7 +140,7 @@ macro_rules! assert_service_already_exists {
 macro_rules! assert_service_invalid_input {
     ($result:expr) => {
         match $result {
-            Err(crate::errors::ServicesError::InvalidInput { .. }) => {}
+            Err($crate::errors::ServicesError::InvalidInput { .. }) => {}
             Ok(_) => panic!(
                 "Expected ServicesError::InvalidInput, got success at {}",
                 std::panic::Location::caller()
@@ -160,7 +158,7 @@ macro_rules! assert_service_invalid_input {
 macro_rules! assert_service_unable_to_delete {
     ($result:expr) => {
         match $result {
-            Err(crate::errors::ServicesError::UnableToDelete { .. }) => {}
+            Err($crate::errors::ServicesError::UnableToDelete { .. }) => {}
             Ok(_) => panic!(
                 "Expected ServicesError::UnableToDelete, got success at {}",
                 std::panic::Location::caller()

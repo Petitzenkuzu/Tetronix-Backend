@@ -133,8 +133,8 @@ mod tests {
         let username3 = fixture.random_user_name();
         fixture
             .with_test_user(|username, user_service| async move {
-                let _ = user_service.create(&username2).await.unwrap();
-                let _ = user_service.create(&username3).await.unwrap();
+                () = user_service.create(&username2).await.unwrap();
+                () = user_service.create(&username3).await.unwrap();
 
                 let user1 = User {
                     name: username,
@@ -155,9 +155,9 @@ mod tests {
                     highest_level: 80,
                 };
 
-                let _ = user_service.update(&user1).await.unwrap();
-                let _ = user_service.update(&user2).await.unwrap();
-                let _ = user_service.update(&user3).await.unwrap();
+                () = user_service.update(&user1).await.unwrap();
+                () = user_service.update(&user2).await.unwrap();
+                () = user_service.update(&user3).await.unwrap();
 
                 let users = user_service.get_top(3).await.unwrap();
 

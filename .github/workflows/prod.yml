@@ -49,6 +49,12 @@ jobs:
     - name: Run tests
       run: cargo test
 
+    - name: Check formatting
+      run: cargo fmt --all --check
+
+    - name: Check clippy
+      run: cargo clippy --all-targets -- -D warnings
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     

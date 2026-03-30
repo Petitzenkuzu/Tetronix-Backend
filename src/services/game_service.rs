@@ -93,7 +93,7 @@ impl<T: GameRepositoryTrait> GameServiceTrait for GameService<T> {
     /// }
     /// ```
     async fn upsert(&self, game: &Game) -> Result<(), ServicesError> {
-        let res = self.game_repository.upsert_game(game).await?;
-        Ok(res)
+        () = self.game_repository.upsert_game(game).await?;
+        Ok(())
     }
 }
