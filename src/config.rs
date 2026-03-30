@@ -39,6 +39,7 @@ impl AuthConfig {
             github_url_override: None,
         }
     }
+    #[cfg(test)]
     pub fn with_github_url(github_url_override: String) -> Self {
         let production = env::var("PRODUCTION")
             .unwrap_or_else(|_| "false".to_string())
