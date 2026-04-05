@@ -54,7 +54,7 @@ async fn start_game(
                         Ok(AggregatedMessage::Binary(bin)) => {
                             // action type (1 byte) + id (4 bytes)
                             if bin.len() != 5 {
-                                ws_session.close(Some(GameCloseReason::InvalidMessageLength.to_close_reason())).await.unwrap();
+                                let _ = ws_session.close(Some(GameCloseReason::InvalidMessageLength.to_close_reason())).await;
                                 return;
                             }
                             let action = match ClientAction::try_from(bin) {
@@ -66,7 +66,7 @@ async fn start_game(
 
                             if let Err(_e) = sender.send(action).await {
                                 tracing::error!("Game engine channel closed unexpectedly");
-                                ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
+                                let _ = ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await;
                                 break;
                             }
                         }
@@ -79,7 +79,7 @@ async fn start_game(
                 Some(msg) = rx.recv() => {
                     if let ServerResponse::InternalServerError(e) = msg {
                         tracing::error!("Internal server error: {}", e);
-                        ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
+                        let _ = ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await;
                         break;
                     }
                     if let ServerResponse::Game(game_builder) = msg {
@@ -87,7 +87,7 @@ async fn start_game(
                         let res = state.game_service.upsert(&game).await;
                         if let Err(e) = res {
                             tracing::error!("Error upserting game: {}", e);
-                            ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
+                            let _ = ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await;
                             break;
                         }
                         else {
@@ -97,14 +97,14 @@ async fn start_game(
                                         .with_games(user.number_of_games.saturating_add(1))
                                         .build();
                             let _ = state.user_service.update(&user).await;
-                            ws_session.close(Some(GameCloseReason::GameEnded.to_close_reason())).await.unwrap();
+                            let _ = ws_session.close(Some(GameCloseReason::GameEnded.to_close_reason())).await;
                             break;
                         }
-
-                        ws_session.close(Some(GameCloseReason::GameEnded.to_close_reason())).await.unwrap();
+                    }
+                    if ws_session.text(serde_json::to_string(&msg).unwrap()).await.is_err() {
+                        let _ = ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await;
                         break;
                     }
-                    ws_session.text(serde_json::to_string(&msg).unwrap()).await.unwrap();
                 }
             }
         }

@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-use crate::models::{Piece, ClientAction, ClientActionType};
-=======
-use crate::models::{ClientAction, ClientActionType, Piece};
->>>>>>> origin/main
-
 use crate::builder::game_builder::GameBuilder;
 use crate::game_logic::PieceRng;
 use crate::game_logic::State;
@@ -11,6 +5,8 @@ use crate::models::Ack;
 use crate::models::Action;
 use crate::models::ActionType;
 use crate::models::ServerResponse;
+use crate::models::{ClientAction, ClientActionType, Piece};
+use crate::return_if_sender_closed;
 use std::time::Duration;
 use std::time::Instant;
 use tokio::sync::mpsc::{Receiver, UnboundedSender};
@@ -38,18 +34,9 @@ impl GameEngine {
             engine.state.set_next_piece(piece_rng.get_next_piece());
             engine.last_fall = 3000_u128; // we put a 3s delay at the start of the game
 
-            let state = match serde_json::to_string(&engine.state) {
-                Ok(state) => state,
-                Err(e) => {
-                    engine
-                        .sender
-                        .send(ServerResponse::InternalServerError(e.to_string()))
-                        .unwrap();
-                    return;
-                }
-            };
+            let state = serde_json::to_string(&engine.state).unwrap();
 
-            engine.sender.send(ServerResponse::Start(state)).unwrap();
+            return_if_sender_closed!(engine.sender.send(ServerResponse::Start(state)));
 
             engine.action_queue.push(Action::new(
                 ActionType::Start,
@@ -67,10 +54,9 @@ impl GameEngine {
                     }
                     // if the actions id are not consecutive, send a missing action message
                     if action.id > engine.state.last_processed_action + 1 {
-                        engine
+                        return_if_sender_closed!(engine
                             .sender
-                            .send(ServerResponse::MissingAction(action.id.to_string()))
-                            .unwrap();
+                            .send(ServerResponse::MissingAction(action.id.to_string())));
                         engine.missing_actions_message_pending = Some((
                             engine.state.last_processed_action + 1,
                             engine.state.timestamp,
@@ -81,10 +67,10 @@ impl GameEngine {
                     if let Some(missing_action) = engine.missing_actions_message_pending {
                         if action.id != missing_action.0 {
                             if missing_action.1 + 1000 < engine.state.timestamp {
-                                engine
+                                return_if_sender_closed!(engine
                                     .sender
-                                    .send(ServerResponse::MissingAction(action.id.to_string()))
-                                    .unwrap();
+                                    .send(ServerResponse::MissingAction(action.id.to_string())));
+
                                 engine.missing_actions_message_pending = Some((
                                     engine.state.last_processed_action + 1,
                                     engine.state.timestamp,
@@ -119,21 +105,22 @@ impl GameEngine {
                                 .with_score(engine.state.score)
                                 .with_level(engine.state.level)
                                 .with_lines(engine.state.lines);
-                            engine.sender.send(ServerResponse::End(state)).unwrap();
-                            engine
-                                .sender
-                                .send(ServerResponse::Game(game_builder))
-                                .unwrap();
+                            // no need to check for errors here because if the sender isn't closed, the engine will stop anyway
+                            let _ = engine.sender.send(ServerResponse::End(state));
+                            let _ = engine.sender.send(ServerResponse::Game(game_builder));
+                            return;
                         }
                         false => {
-                            engine.sender.send(ServerResponse::State(state)).unwrap();
+                            return_if_sender_closed!(engine
+                                .sender
+                                .send(ServerResponse::State(state)));
                         }
                     }
                 } else if engine.send_ack {
                     engine.send_ack = false;
                     let ack = Ack::new(engine.state.last_processed_action);
                     let ack_str = serde_json::to_string(&ack).unwrap();
-                    engine.sender.send(ServerResponse::Ack(ack_str)).unwrap();
+                    return_if_sender_closed!(engine.sender.send(ServerResponse::Ack(ack_str)));
                 }
                 std::thread::sleep(Duration::from_millis(16)); // 60 tick per seconds
             }
