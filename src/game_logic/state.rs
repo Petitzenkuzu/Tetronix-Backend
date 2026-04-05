@@ -1,7 +1,7 @@
 use crate::game_logic::Grid;
 use crate::models::Piece;
 use crate::models::PieceType;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct State {
@@ -41,23 +41,23 @@ impl State {
         }
     }
 
-    pub fn set_current_piece(&mut self, piece : Piece) {
+    pub fn set_current_piece(&mut self, piece: Piece) {
         self.current_piece = piece;
     }
 
-    pub fn set_next_piece(&mut self, piece : Piece) {
+    pub fn set_next_piece(&mut self, piece: Piece) {
         self.next_piece = piece;
     }
 
-    pub fn add_to_score(&mut self, score : i32) {
+    pub fn add_to_score(&mut self, score: i32) {
         self.score += score;
     }
 
-    pub fn add_to_level(&mut self, level : i32) {
+    pub fn add_to_level(&mut self, level: i32) {
         self.level += level;
     }
 
-    pub fn add_to_lines(&mut self, lines : i32) {
+    pub fn add_to_lines(&mut self, lines: i32) {
         self.lines += lines;
     }
 }

@@ -1,44 +1,44 @@
-use crate::models::{Game, Action};
+use crate::models::{Action, Game};
 use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize)]
 pub struct GameBuilder {
-    pub game : Game
+    pub game: Game,
 }
 
 impl GameBuilder {
-    pub fn new(owner : &str) -> Self {
-        Self { 
+    pub fn new(owner: &str) -> Self {
+        Self {
             game: Game {
                 game_owner: owner.to_string(),
                 game_score: 0,
                 game_level: 0,
                 game_lines: 0,
                 game_actions: vec![],
-            }
-         }
+            },
+        }
     }
 
-    pub fn with_owner(mut self, owner : &str) -> Self {
+    pub fn with_owner(mut self, owner: &str) -> Self {
         self.game.game_owner = owner.to_string();
         self
     }
 
-    pub fn with_score(mut self, score : i32) -> Self {
+    pub fn with_score(mut self, score: i32) -> Self {
         self.game.game_score = score;
         self
     }
 
-    pub fn with_level(mut self, level : i32) -> Self {
+    pub fn with_level(mut self, level: i32) -> Self {
         self.game.game_level = level;
         self
     }
 
-    pub fn with_lines(mut self, lines : i32) -> Self {
+    pub fn with_lines(mut self, lines: i32) -> Self {
         self.game.game_lines = lines;
         self
     }
 
-    pub fn with_actions(mut self, actions : Vec<Action>) -> Self {
+    pub fn with_actions(mut self, actions: Vec<Action>) -> Self {
         self.game.game_actions = actions;
         self
     }

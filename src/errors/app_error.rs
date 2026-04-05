@@ -1,6 +1,10 @@
-use actix_web::{ error, http::{header::ContentType, StatusCode}, HttpResponse };
-use thiserror::Error;
 use crate::errors::ServicesError;
+use actix_web::{
+    error,
+    http::{header::ContentType, StatusCode},
+    HttpResponse,
+};
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AppError {
@@ -25,28 +29,27 @@ impl From<ServicesError> for AppError {
         match err {
             ServicesError::AuthenticationFailed { reason } => {
                 AppError::AuthenticationFailed(reason)
-            },
+            }
             ServicesError::InvalidInput { field, message } => {
                 AppError::BadRequest(format!("Invalid {}: {}", field, message))
-            },
-            ServicesError::NotFound { what } => {
-                AppError::NotFound(format!("{} not found", what))
-            },
+            }
+            ServicesError::NotFound { what } => AppError::NotFound(format!("{} not found", what)),
             ServicesError::AlreadyExists { what } => {
                 AppError::Conflict(format!("{} already exists", what))
-            },
-            ServicesError::UnableToDelete { what: _ } => {
-                AppError::InternalServerError("Something went wrong".to_string())
-            },
+            }
             ServicesError::UnableToSerialize { what: _ } => {
                 AppError::InternalServerError("Data processing error".to_string())
-            },
+            }
             ServicesError::UnableToDeserialize { what: _ } => {
                 AppError::InternalServerError("Data processing error".to_string())
-            },
+            }
             ServicesError::InternalServerError(_) => {
                 AppError::InternalServerError("Something went wrong".to_string())
-            },
+            }
+            ServicesError::InvalidJWT { .. } => AppError::Unauthorized,
+            ServicesError::UnableToDelete { .. } => {
+                AppError::InternalServerError("Something went wrong".to_string())
+            }
         }
     }
 }
@@ -54,20 +57,16 @@ impl From<ServicesError> for AppError {
 impl error::ResponseError for AppError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            AppError::RateLimitExceeded => {
-                HttpResponse::TooManyRequests()
+            AppError::RateLimitExceeded => HttpResponse::TooManyRequests()
                 .insert_header(("X-RateLimit-Limit", "100"))
                 .insert_header(("X-RateLimit-Remaining", "0"))
                 .insert_header(("Retry-After", "10"))
                 .json(serde_json::json!({
                     "error": "Rate limit exceeded"
-                }))
-            },
-            _ => {
-                HttpResponse::build(self.status_code())
+                })),
+            _ => HttpResponse::build(self.status_code())
                 .insert_header(ContentType::json())
-                .body(self.to_string())   
-            }
+                .body(self.to_string()),
         }
     }
 

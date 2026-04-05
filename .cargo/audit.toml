@@ -1,0 +1,8 @@
+[advisories]
+ignore = [
+    # rsa 0.9.8 - Marvin Attack: timing sidechannel in RSA key recovery
+    # Transitive dependency via sqlx-mysql. No fix available upstream.
+    # Not directly exploitable since RSA is only used internally by sqlx for MySQL auth,
+    # and this project uses PostgreSQL exclusively.
+    "RUSTSEC-2023-0071",
+]

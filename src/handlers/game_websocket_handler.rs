@@ -1,32 +1,43 @@
-use actix_web::{HttpRequest, get, HttpResponse};
-use actix_web::{rt, web};
+use crate::builder::user_builder::UserBuilder;
 use crate::errors::AppError;
-use actix_ws::{AggregatedMessage};
-use futures_util::StreamExt as _;
-use crate::models::{Session, GameResult, GameCloseReason};
-use crate::models::{Action, ActionType, PieceType};
 use crate::game_logic::GameEngine;
-use crate::ConcreteAppState;
-use crate::builder::{game_builder::GameBuilder, user_builder::UserBuilder};
-use crate::services::UserServiceTrait;
-use crate::services::GameServiceTrait;
 use crate::models::ClientAction;
 use crate::models::ServerResponse;
+use crate::models::{AuthenticatedUser, GameCloseReason};
+use crate::services::GameServiceTrait;
+use crate::services::UserServiceTrait;
+use crate::ConcreteAppState;
+use actix_web::{get, HttpRequest, HttpResponse};
+use actix_web::{rt, web};
+use actix_ws::AggregatedMessage;
+use futures_util::StreamExt as _;
 
 #[get("/start")]
-async fn start_game(session: Session, state: web::Data<ConcreteAppState>, req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, AppError> {
-    let (res, mut ws_session, stream) = actix_ws::handle(&req, stream).map_err(|_| AppError::InternalServerError("Failed to start game".to_string()))?;
+async fn start_game(
+    authenticated_user: AuthenticatedUser,
+    state: web::Data<ConcreteAppState>,
+    req: HttpRequest,
+    stream: web::Payload,
+) -> Result<HttpResponse, AppError> {
+    let (res, mut ws_session, stream) = actix_ws::handle(&req, stream)
+        .map_err(|_| AppError::InternalServerError("Failed to start game".to_string()))?;
 
     let mut stream = stream
         .aggregate_continuations()
         .max_continuation_size(2_usize.pow(10));
 
-
     rt::spawn(async move {
-        let user = match state.user_service.get_by_name(&session.name).await {
+        let user = match state
+            .user_service
+            .get_by_name(&authenticated_user.username)
+            .await
+        {
             Ok(user) => user,
-            Err(e) => {
-                ws_session.close(Some(GameCloseReason::NoUserFound.to_close_reason())).await.unwrap();
+            Err(_) => {
+                ws_session
+                    .close(Some(GameCloseReason::NoUserFound.to_close_reason()))
+                    .await
+                    .unwrap();
                 return;
             }
         };
@@ -79,11 +90,14 @@ async fn start_game(session: Session, state: web::Data<ConcreteAppState>, req: H
                             ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
                             break;
                         }
-                        let updated_user = UserBuilder::new(&user.name).with_score(std::cmp::max(user.best_score, game.game_score)).with_level(std::cmp::max(user.highest_level, game.game_level)).with_games(user.number_of_games + 1).build();
-                        let res = state.user_service.update(&updated_user).await;
-                        if let Err(e) = res {
-                            tracing::error!("Error updating user: {}", e);
-                            ws_session.close(Some(GameCloseReason::InternalError.to_close_reason())).await.unwrap();
+                        else {
+                            let user = UserBuilder::new(&user.name)
+                                        .with_score(std::cmp::max(user.best_score, game.game_score))
+                                        .with_level(std::cmp::max(user.highest_level, game.game_level))
+                                        .with_games(user.number_of_games.saturating_add(1))
+                                        .build();
+                            let _ = state.user_service.update(&user).await;
+                            ws_session.close(Some(GameCloseReason::GameEnded.to_close_reason())).await.unwrap();
                             break;
                         }
 

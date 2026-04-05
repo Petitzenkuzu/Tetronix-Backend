@@ -1,12 +1,9 @@
-mod user_repository;
-mod session_repository;
 mod game_repository;
+mod user_repository;
 
-pub use user_repository::UserRepository;
-pub use session_repository::SessionRepository;
 pub use game_repository::GameRepository;
+pub use user_repository::UserRepository;
 
 mod traits;
-pub use traits::UserRepositoryTrait;
-pub use traits::SessionRepositoryTrait;
 pub use traits::GameRepositoryTrait;
+pub use traits::UserRepositoryTrait;

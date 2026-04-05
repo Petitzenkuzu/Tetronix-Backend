@@ -1,18 +1,22 @@
 use actix_web::web::Bytes;
-use serde::{Deserialize, Serialize, Deserializer, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sqlx::FromRow;
 
 #[derive(Deserialize, Serialize, Debug, FromRow, PartialEq)]
 pub struct ClientAction {
-    pub action_type : ClientActionType,
-    pub id : u32
+    pub action_type: ClientActionType,
+    pub id: u32,
 }
 
 impl TryFrom<Bytes> for ClientAction {
     type Error = &'static str;
     fn try_from(value: Bytes) -> Result<Self, Self::Error> {
         let action_type = ClientActionType::from_u8(value[0]);
-        let id = u32::from_be_bytes(value[1..5].try_into().map_err(|_| "Invalid message length")?);
+        let id = u32::from_be_bytes(
+            value[1..5]
+                .try_into()
+                .map_err(|_| "Invalid message length")?,
+        );
         Ok(Self { action_type, id })
     }
 }
@@ -46,7 +50,7 @@ impl<'de> Deserialize<'de> for ClientActionType {
 }
 
 impl ClientActionType {
-    pub fn to_u8(&self) -> u8 {
+    pub fn to_u8(self) -> u8 {
         match self {
             ClientActionType::Right => 0x00,
             ClientActionType::Left => 0x01,
@@ -54,7 +58,7 @@ impl ClientActionType {
             ClientActionType::HardDrop => 0x03,
         }
     }
-    pub fn from_u8(binary : u8) -> Self {
+    pub fn from_u8(binary: u8) -> Self {
         match binary {
             0x00 => Self::Right,
             0x01 => Self::Left,

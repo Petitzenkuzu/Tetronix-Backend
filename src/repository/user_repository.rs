@@ -1,7 +1,7 @@
-use sqlx::{Pool, Postgres};
-use crate::models::User;
 use crate::errors::RepositoryError;
+use crate::models::User;
 use crate::repository::UserRepositoryTrait;
+use sqlx::{Pool, Postgres};
 #[derive(Clone)]
 pub struct UserRepository {
     pub db: Pool<Postgres>,
@@ -13,21 +13,20 @@ impl UserRepository {
 }
 
 impl UserRepositoryTrait for UserRepository {
-
     /// Create a new user
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `name` - The name of the user to create
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Ok(())` - If the user has been created successfully
     /// * `Err(RepositoryError::AlreadyExists)` - If a user with this name already exists
     /// * `Err(RepositoryError::InternalServerError)` - If there is a database error
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// let repo = UserRepository::new(db_pool);
     /// match repo.create_user("john_doe").await {
@@ -36,48 +35,46 @@ impl UserRepositoryTrait for UserRepository {
     /// }
     /// ```
     async fn create_user(&self, name: &str) -> Result<(), RepositoryError> {
-        let result = sqlx::query(
-            "INSERT INTO users (name) VALUES ($1)",
-        )
-        .bind(name)
-        .execute(&self.db)
-        .await;
-        
+        let result = sqlx::query("INSERT INTO users (name) VALUES ($1)")
+            .bind(name)
+            .execute(&self.db)
+            .await;
+
         match result {
             Ok(_) => Ok(()),
-            Err(e) => {
-                match e {
-                    sqlx::Error::Database(e) => {
-                        if e.is_unique_violation() {
-                            Err(RepositoryError::AlreadyExists{what: "User".into()})
-                        } 
-                        else if e.is_check_violation() {
-                            Err(RepositoryError::InvalidInput{what: "User name".into()})
-                        }
-                        else {
-                            Err(RepositoryError::InternalServerError(e.to_string()))
-                        }
+            Err(e) => match e {
+                sqlx::Error::Database(e) => {
+                    if e.is_unique_violation() {
+                        Err(RepositoryError::AlreadyExists {
+                            what: "User".into(),
+                        })
+                    } else if e.is_check_violation() {
+                        Err(RepositoryError::InvalidInput {
+                            what: "User name".into(),
+                        })
+                    } else {
+                        Err(RepositoryError::InternalServerError(e.to_string()))
                     }
-                    _ => Err(RepositoryError::InternalServerError(e.to_string())),
                 }
+                _ => Err(RepositoryError::InternalServerError(e.to_string())),
             },
         }
     }
 
     /// Update a user
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `user` - The user to update
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Ok(())` - If the user has been updated successfully
     /// * `Err(RepositoryError::NotFound)` - If the user does not exist
     /// * `Err(RepositoryError::InternalServerError)` - If there is a database error
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// let repo = UserRepository::new(db_pool);
     /// match repo.update_user(&user).await {
@@ -93,33 +90,35 @@ impl UserRepositoryTrait for UserRepository {
             .bind(&user.name)
             .execute(&self.db)
             .await;
-    
+
         match result {
             Ok(result) => {
                 if result.rows_affected() == 0 {
-                    Err(RepositoryError::NotFound{what: "User".into()})
+                    Err(RepositoryError::NotFound {
+                        what: "User".into(),
+                    })
                 } else {
                     Ok(())
                 }
-            },
+            }
             Err(e) => Err(RepositoryError::InternalServerError(e.to_string())),
         }
     }
 
     /// Get a user by name
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `name` - The name of the user to get
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Ok(user)` - If the user has been found
     /// * `Err(RepositoryError::NotFound)` - If the user does not exist
     /// * `Err(RepositoryError::InternalServerError)` - If there is a database error
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// let repo = UserRepository::new(db_pool);
     /// match repo.get_user_by_name("john_doe").await {
@@ -128,33 +127,33 @@ impl UserRepositoryTrait for UserRepository {
     /// }
     /// ```
     async fn get_user_by_name(&self, name: &str) -> Result<User, RepositoryError> {
-        let user = sqlx::query_as::<_, User>(
-            "SELECT * FROM users WHERE name = $1",
-        )
-        .bind(name)
-        .fetch_optional(&self.db)
-        .await;
+        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE name = $1")
+            .bind(name)
+            .fetch_optional(&self.db)
+            .await;
         match user {
             Ok(Some(user)) => Ok(user),
-            Ok(None) => Err(RepositoryError::NotFound{what: "User".into()}),
+            Ok(None) => Err(RepositoryError::NotFound {
+                what: "User".into(),
+            }),
             Err(e) => Err(RepositoryError::InternalServerError(e.to_string())),
         }
     }
 
     /// Get the x top users
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `limit` - The number of users to get
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Ok(users)` - If the users have been found
     /// * `Err(RepositoryError::InvalidLimit)` - If the limit is not between 0 and 100
     /// * `Err(RepositoryError::InternalServerError)` - If there is a database error
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// let repo = UserRepository::new(db_pool);
     /// match repo.get_top_users(10).await {
@@ -164,13 +163,14 @@ impl UserRepositoryTrait for UserRepository {
     /// ```
     async fn get_top_users(&self, limit: i32) -> Result<Vec<User>, RepositoryError> {
         if limit <= 0 || limit > 100 {
-            return Err(RepositoryError::InvalidLimit{low: 0, high: 100});
+            return Err(RepositoryError::InvalidLimit { low: 0, high: 100 });
         }
 
-        let leaderboard = sqlx::query_as::<_, User>("SELECT * FROM users ORDER BY best_score DESC LIMIT $1")
-            .bind(limit)
-            .fetch_all(&self.db)
-            .await;
+        let leaderboard =
+            sqlx::query_as::<_, User>("SELECT * FROM users ORDER BY best_score DESC LIMIT $1")
+                .bind(limit)
+                .fetch_all(&self.db)
+                .await;
         match leaderboard {
             Ok(leaderboard) => Ok(leaderboard),
             Err(e) => Err(RepositoryError::InternalServerError(e.to_string())),
@@ -178,19 +178,19 @@ impl UserRepositoryTrait for UserRepository {
     }
 
     /// Delete a user
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `name` - The name of the user to delete
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Ok(())` - If the user has been deleted successfully
     /// * `Err(RepositoryError::NotFound)` - If the user does not exist
     /// * `Err(RepositoryError::InternalServerError)` - If there is a database error
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// let repo = UserRepository::new(db_pool);
     /// match repo.delete_user("john_doe").await {
@@ -206,11 +206,13 @@ impl UserRepositoryTrait for UserRepository {
         match result {
             Ok(result) => {
                 if result.rows_affected() == 0 {
-                    Err(RepositoryError::NotFound{what: "User".into()})
+                    Err(RepositoryError::NotFound {
+                        what: "User".into(),
+                    })
                 } else {
                     Ok(())
                 }
-            },
+            }
             Err(e) => Err(RepositoryError::InternalServerError(e.to_string())),
         }
     }

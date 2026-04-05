@@ -1,26 +1,36 @@
-use actix_web::{rt, web::{self, Data}, App ,HttpServer,middleware::Logger, HttpResponse};
-mod models;
-mod errors;
-mod services;
-mod repository;
-mod middleware;
-mod handlers;
-mod game_logic;
-mod config;
-mod tests;
+use actix_web::{
+    middleware::Logger,
+    rt,
+    web::{self, Data},
+    App, HttpResponse, HttpServer,
+};
 mod builder;
-use middleware::rate_limiter::RateLimiterTransform;
-use handlers::{github_auth, get_user, get_leaderboard, logout, get_stats, get_game, get_stats_by_owner, start_game};
-use dotenv::dotenv;
-use sqlx::postgres::PgPoolOptions;
-use models::ConcreteAppState;
-use env_logger::Env;
-use config::{AuthConfig, SessionConfig, ServerConfig};
+mod config;
+mod errors;
+mod game_logic;
+mod handlers;
+mod middleware;
+mod models;
+mod repository;
+mod services;
+#[cfg(test)]
+mod tests;
 use actix_web_prom::PrometheusMetricsBuilder;
+use config::{AuthConfig, ServerConfig};
+use dotenv::dotenv;
+use env_logger::Env;
+use handlers::{
+    get_game, get_leaderboard, get_stats, get_stats_by_owner, get_user, github_auth, logout,
+    start_game,
+};
+use middleware::auth_middleware::Auth;
+use middleware::rate_limiter::RateLimiterTransform;
+use models::ConcreteAppState;
 use prometheus::Gauge;
+use sqlx::postgres::PgPoolOptions;
 use systemstat::{Platform, System};
-use tracing_subscriber::FmtSubscriber;
 use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -28,31 +38,36 @@ async fn main() -> std::io::Result<()> {
         .with_max_level(Level::INFO)
         .finish();
 
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("setting default subscriber failed");
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     let sys = System::new();
     dotenv().ok();
     env_logger::init_from_env(Env::default().default_filter_or("info"));
-    
+
     let server_config = ServerConfig::from_env();
 
     let pool = PgPoolOptions::new()
-    .max_connections(20)
-    .connect(&server_config.database_url)
-    .await
-    .expect("Failed to connect to DB");
+        .max_connections(20)
+        .connect(&server_config.database_url)
+        .await
+        .expect("Failed to connect to DB");
 
     let prometheus = PrometheusMetricsBuilder::new("api")
-    .endpoint("/metrics")
-    .build()
-    .unwrap();
+        .endpoint("/metrics")
+        .build()
+        .unwrap();
 
-    let mem_gauge=Gauge::new("memory_usage", "Memory usage in bytes").unwrap();
-    let cpu_gauge=Gauge::new("cpu_usage", "CPU usage in percentage").unwrap();
+    let mem_gauge = Gauge::new("memory_usage", "Memory usage in bytes").unwrap();
+    let cpu_gauge = Gauge::new("cpu_usage", "CPU usage in percentage").unwrap();
 
-    prometheus.registry.register(Box::new(mem_gauge.clone())).unwrap();
-    prometheus.registry.register(Box::new(cpu_gauge.clone())).unwrap();
+    prometheus
+        .registry
+        .register(Box::new(mem_gauge.clone()))
+        .unwrap();
+    prometheus
+        .registry
+        .register(Box::new(cpu_gauge.clone()))
+        .unwrap();
 
     // spawn a tokio task to get the CPU and memory usage every second
     rt::spawn(async move {
@@ -62,7 +77,7 @@ async fn main() -> std::io::Result<()> {
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                     let cpu = cpu.done().unwrap();
                     cpu_gauge.set(f64::trunc(((cpu.user + cpu.system) * 100.0).into()));
-                },
+                }
                 Err(e) => {
                     eprintln!("Error getting CPU load: {}", e);
                 }
@@ -78,35 +93,39 @@ async fn main() -> std::io::Result<()> {
         }
     });
 
-    HttpServer::new(move|| {
-
+    HttpServer::new(move || {
         let auth_config = AuthConfig::from_env();
-        let session_config = SessionConfig::from_env();
+        let state = ConcreteAppState::new(pool.clone(), auth_config);
 
-        let state = ConcreteAppState::new(pool.clone(), auth_config, session_config);
-        
         App::new()
-        .wrap(Logger::default())
-        .wrap(prometheus.clone())
-        .app_data(Data::new(state))
-        .wrap(RateLimiterTransform)
-        .default_service(web::route().to(|| async {HttpResponse::Unauthorized().body("Unauthorized")}))
-        .service(
-            web::scope("/auth")
-            .service(github_auth)
-            .service(logout)
-        )
-        .service(get_user)
-        .service(get_leaderboard)
-        .service(
-            web::scope("/game")
-            .default_service(web::route().to(|| async {HttpResponse::Unauthorized().body("Unauthorized")}))
-            .service(get_stats)
-            .service(get_stats_by_owner)
-            .service(get_game)
-            .service(start_game)
-        )
-    }).workers(4)
+            .wrap(Logger::default())
+            .wrap(prometheus.clone())
+            .app_data(Data::new(state))
+            .wrap(RateLimiterTransform)
+            .default_service(
+                web::route().to(|| async { HttpResponse::Unauthorized().body("Unauthorized") }),
+            )
+            .service(web::scope("/auth").service(github_auth).service(logout))
+            .service(
+                web::scope("")
+                    .wrap(Auth)
+                    .service(get_user)
+                    .service(get_leaderboard)
+                    .service(
+                        web::scope("/game")
+                            .default_service(
+                                web::route().to(|| async {
+                                    HttpResponse::Unauthorized().body("Unauthorized")
+                                }),
+                            )
+                            .service(get_stats)
+                            .service(get_stats_by_owner)
+                            .service(get_game)
+                            .service(start_game),
+                    ),
+            )
+    })
+    .workers(4)
     .bind(("0.0.0.0", server_config.port))?
     .run()
     .await
