@@ -13,7 +13,7 @@ pub async fn github_auth(
 ) -> Result<impl Responder, AppError> {
     let jwt = state
         .auth_service
-        .authenticate_with_github(&query.code, &query.redirect_uri)
+        .authenticate_with_github(&query.code, &query.redirect_uri, &query.code_verifier)
         .await
         .map_err(|e| AppError::AuthenticationFailed(e.to_string()))?;
     let cookie = state.auth_service.create_cookies(jwt);

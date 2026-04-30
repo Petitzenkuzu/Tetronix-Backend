@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct GithubCredentials {
     pub code: String,
     pub redirect_uri: String,
+    pub code_verifier: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

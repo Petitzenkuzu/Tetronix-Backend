@@ -44,7 +44,7 @@ mod tests {
         .await;
 
         let req = test::TestRequest::get()
-            .uri("/github?code=test_code&redirect_uri=test_redirect_uri")
+            .uri("/github?code=test_code&redirect_uri=test_redirect_uri&code_verifier=test_code_verifier")
             .to_request();
 
         let resp = test::call_service(&app, req).await;
