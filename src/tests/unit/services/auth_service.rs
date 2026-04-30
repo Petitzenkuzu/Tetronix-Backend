@@ -30,7 +30,7 @@ mod tests {
 
         let jwt_token = fixture
             .auth_service
-            .authenticate_with_github("test_code", "redirect_uri")
+            .authenticate_with_github("test_code", "redirect_uri", "test_code_verifier")
             .await;
         assert!(jwt_token.is_ok());
         let jwt_token = jwt_token.unwrap();

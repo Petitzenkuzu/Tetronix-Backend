@@ -24,6 +24,7 @@ pub trait AuthServiceTrait: Clone {
         &self,
         code: &str,
         redirect_uri: &str,
+        code_verifier: &str,
     ) -> Result<String, ServicesError>;
     fn create_cookies(&self, jwt: String) -> Cookie<'_>;
     fn logout_cookies(&self) -> Cookie<'_>;

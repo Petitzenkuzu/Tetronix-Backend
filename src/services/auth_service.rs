@@ -50,6 +50,7 @@ impl<T: UserRepositoryTrait> AuthService<T> {
         &self,
         code: &str,
         redirect_uri: &str,
+        code_verifier: &str,
     ) -> Result<String, ServicesError> {
         let client_id = &self.config.github_client_id;
         let client_secret = &self.config.github_client_secret;
@@ -68,6 +69,7 @@ impl<T: UserRepositoryTrait> AuthService<T> {
                 ("client_secret", client_secret.as_str()),
                 ("code", code),
                 ("redirect_uri", redirect_uri),
+                ("code_verifier", code_verifier),
             ])
             .header("Accept", "application/json")
             .send()
@@ -76,13 +78,12 @@ impl<T: UserRepositoryTrait> AuthService<T> {
                 reason: format!("access token exchange failed : {}", e),
             })?;
 
-        let token_data = response.json::<GithubTokenResponse>().await.map_err(|_| {
+        let access_token = response.json::<GithubTokenResponse>().await.map_err(|_| {
             ServicesError::UnableToDeserialize {
                 what: "GithubTokenResponse".to_string(),
             }
         })?;
-
-        Ok(token_data.access_token)
+        Ok(access_token.access_token)
     }
 
     /// Exchange an access token for user info
@@ -276,10 +277,11 @@ impl<T: UserRepositoryTrait> AuthServiceTrait for AuthService<T> {
         &self,
         code: &str,
         redirect_uri: &str,
+        code_verifier: &str,
     ) -> Result<String, ServicesError> {
         //Get GitHub user info
         let access_token = self
-            .exchange_code_for_access_token(code, redirect_uri)
+            .exchange_code_for_access_token(code, redirect_uri, code_verifier)
             .await?;
         let github_user = self
             .exchange_access_token_for_user_info(&access_token)
